@@ -23,7 +23,11 @@ if ! rg -q 'PASS: term archiving' "$cluster_dir/term.log"; then cat "$cluster_di
 { cat "$project_root/scripts/db-calendar-test.sql"; printf '\n'; } | postgres --single -j -c absentia.offline=on -D "$cluster_dir/data" postgres > "$cluster_dir/calendar.log" 2>&1
 if rg -q 'ERROR|FATAL' "$cluster_dir/calendar.log"; then cat "$cluster_dir/calendar.log"; exit 1; fi
 if ! rg -q 'PASS: academic calendar' "$cluster_dir/calendar.log"; then cat "$cluster_dir/calendar.log"; exit 1; fi
+{ cat "$project_root/scripts/db-initial-absences-test.sql"; printf '\n'; } | postgres --single -j -c absentia.offline=on -D "$cluster_dir/data" postgres > "$cluster_dir/initial-absences.log" 2>&1
+if rg -q 'ERROR|FATAL' "$cluster_dir/initial-absences.log"; then cat "$cluster_dir/initial-absences.log"; exit 1; fi
+if ! rg -q 'PASS: initial absence balances' "$cluster_dir/initial-absences.log"; then cat "$cluster_dir/initial-absences.log"; exit 1; fi
 printf 'PASS: real PostgreSQL migration, authentication, recovery, isolation, attendance, rate limits, RLS configuration and deletion (effective-role RLS requires a server).\n'
 printf 'PASS: timetable sharing, privacy, cohort restrictions, duplication, expiry and revocation.\n'
 printf 'PASS: automatic term archiving, transaction rollback, preserved history and academic-year isolation.\n'
 printf 'PASS: academic calendar exclusions, inclusive dates, recurrence, historical records and cleanup.\n'
+printf 'PASS: initial absence balances, atomic updates, isolation, private sharing and term archives.\n'

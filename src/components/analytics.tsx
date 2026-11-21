@@ -190,6 +190,8 @@ export function Analytics({
     );
     return {
       ...semesterData,
+      // Undated starting balances cannot be assigned to a selected date range.
+      modules: from || to ? semesterData.modules.map((module) => ({ ...module, initial_justified_absences: 0, initial_unjustified_absences: 0 })) : semesterData.modules,
       occurrences,
       attendance: semesterData.attendance.filter((record) =>
         occurrenceIds.has(record.occurrence_id),
@@ -480,6 +482,7 @@ export function Analytics({
           </p>
         )}
       </section>
+      {riskOverview.initialAbsences > 0 && <p className="muted initial-absence-summary">{t(language, "analytics.initialNotice")}</p>}
       <div className="stats-grid">
         {[
           {

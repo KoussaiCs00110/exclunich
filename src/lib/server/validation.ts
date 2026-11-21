@@ -51,6 +51,8 @@ export const dataSchema = z
       semester: required(30),
       total_threshold: threshold.nullable().optional().default(null),
       unjustified_threshold: threshold.nullable().optional().default(null),
+      initial_justified_absences: z.number().int().min(0).max(1000).optional(),
+      initial_unjustified_absences: z.number().int().min(0).max(1000).optional(),
     }),
     id.extend({ action: z.literal("module_delete") }),
     id.extend({ action: z.literal("module_archive"), archived: z.boolean() }),

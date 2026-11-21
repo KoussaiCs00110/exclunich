@@ -24,6 +24,9 @@ try {
   await client.query(
     await readFile(new URL("./db-calendar-test.sql", import.meta.url), "utf8"),
   );
+  await client.query(
+    await readFile(new URL("./db-initial-absences-test.sql", import.meta.url), "utf8"),
+  );
   console.log(
     "PASS: database authentication, tenant isolation, attendance, recovery, rate limiting and RLS. Fixtures rolled back.",
   );

@@ -27,7 +27,7 @@ Set these values in `.env.local`:
 - `APP_URL`: `http://localhost:3000` for development; the exact HTTPS origin in production.
 - `SUPABASE_URL` and `SUPABASE_SECRET_KEY`: the project's URL and **server secret** API key. The older JWT service-role key can instead be supplied as `SUPABASE_SERVICE_ROLE_KEY`.
 
-For a new project, apply all SQL files in `supabase/migrations` in numbered order using the Supabase SQL editor as database owner. For an existing installation, apply only pending migrations; do not rerun installed migrations. Install [automatic term archiving](supabase/migrations/202611210001_term_archiving.sql) after sharing, followed by [academic-calendar enforcement](supabase/migrations/202611210002_academic_calendar.sql). This installs the schema, constraints, indexes, RLS and restricted RPCs. There are no public browser credentials to configure.
+For a new project, apply all SQL files in `supabase/migrations` in numbered order using the Supabase SQL editor as database owner. For an existing installation, apply only pending migrations; do not rerun installed migrations. After sharing, install [automatic term archiving](supabase/migrations/202611210001_term_archiving.sql), [academic-calendar enforcement](supabase/migrations/202611210002_academic_calendar.sql), and [starting absence balances](supabase/migrations/202611210003_initial_absences.sql). This installs the schema, constraints, indexes, RLS and restricted RPCs. There are no public browser credentials to configure.
 
 ```bash
 npm run dev
@@ -45,7 +45,7 @@ To apply pending migrations, use an owner connection:
 npm run db:migrate
 ```
 
-For runtime, use a restricted database role with schema usage and execution permission on `public.absentia_api(text,jsonb,text)` and `public.exclunich_sharing(text,jsonb,text)`. It does not need direct table privileges. Keep migration-owner credentials separate from runtime credentials. Never commit a connection string or `.env.local`.
+For runtime, use a restricted database role with schema usage and execution permission on `public.absentia_api(text,jsonb,text)`, `public.exclunich_sharing(text,jsonb,text)` and `public.exclunich_module_save(text,jsonb,text)`. The starting-balance migration copies trusted execution grants from the existing API; grant all three when creating a new runtime role afterward. It does not need direct table privileges. Keep migration-owner credentials separate from runtime credentials. Never commit a connection string or `.env.local`.
 
 ## Architecture
 
@@ -59,6 +59,10 @@ Browser → Next.js protected pages / JSON route handlers
 `src/lib/attendance.ts` is the single exclusion engine used by dashboard, module views, simulator, analytics and notification generation. `src/lib/timezone.ts` handles calendar dates in the configured IANA timezone. Defaults are Africa/Algiers, 5 total absences and 3 unjustified absences. Module thresholds can override student defaults.
 
 The relational model separates weekly session templates from concrete dated occurrences. An attendance record references exactly one occurrence. A composite owner/module foreign key prevents linking another student's records. Cancelled occurrences and cancelled attendance never count. Future occurrences are excluded from actual attendance totals. Unrecorded sessions remain visible and do not invent absences or presence.
+
+Students joining mid-semester can enter **Absences before Exclunich** when adding or editing each module. Separate justified and unjustified balances (whole numbers from 0 to 1000) are added to dated absences for totals, risk, simulations and alerts. Updating a balance replaces it; enter only absences not already recorded as sessions to avoid double counting. No session dates or attendance rows are fabricated. Percentages, trends, session-type charts, history and session exports continue to use dated records; date-filtered absence charts omit the undated balance. Module cards and details show how much of the total comes from earlier absences.
+
+Balances are private, never included in timetable shares, and preserved in archived modules. New modules and imported timetables start at zero; importing into an existing module preserves that student's balances. Install `202611210003_initial_absences.sql` before saving balances. If it is missing, the app refuses the balance save without partially changing the module, while ordinary module edits without balances continue to work.
 
 The timetable runs from Sunday through Saturday for every account. Older profile settings cannot hide Sunday sessions. Weekly and daily views, the mobile agenda and session details use the same complete schedule.
 

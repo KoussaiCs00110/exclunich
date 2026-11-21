@@ -81,6 +81,20 @@ describe("persistent local demo workflows", () => {
     vi.unstubAllEnvs();
     await rm(directory, { recursive: true, force: true });
   });
+  it("persists starting balances, replaces them, and preserves them when omitted", async () => {
+    const before = await localDemoSnapshot();
+    const item = before.modules[0];
+    const save = { ...item, action: "module_save", description: item.description ?? "" };
+    await mutateLocalDemo({ ...save, initial_justified_absences: 1, initial_unjustified_absences: 2 });
+    const after = await localDemoSnapshot();
+    expect(after.attendance).toEqual(before.attendance);
+    expect(getModuleStats(after.modules[0], after).totalAbsences).toBe(getModuleStats(item, before).totalAbsences + 3);
+    await mutateLocalDemo({ ...save, name: "Renamed" });
+    expect((await localDemoSnapshot()).modules[0]).toMatchObject({ initial_justified_absences: 1, initial_unjustified_absences: 2 });
+    await mutateLocalDemo({ ...save, initial_justified_absences: 0, initial_unjustified_absences: 0 });
+    expect((await localDemoSnapshot()).modules[0]).toMatchObject({ initial_justified_absences: 0, initial_unjustified_absences: 0 });
+    await expect(mutateLocalDemo({ ...save, initial_unjustified_absences: -1 })).rejects.toThrow("whole numbers");
+  });
   it("creates, previews and revokes a sharing token without exposing stored hashes", async () => {
     await localDemoSnapshot();
     const created = (await localDemoSharing({

@@ -12,6 +12,9 @@ const profile = {
 test("Sunday sessions are visible even with the legacy Sunday preference disabled", async ({
   page,
 }) => {
+  // Use a full teaching week so this visibility test stays independent of breaks.
+  const calendarDate = new Date("2026-11-21T12:00:00Z");
+  await page.clock.setFixedTime(calendarDate);
   await page.goto("/login");
   const account = await api(page, "/api/auth", {
     action: "register",
@@ -37,7 +40,7 @@ test("Sunday sessions are visible even with the legacy Sunday preference disable
       total_threshold: null,
       unjustified_threshold: null,
     });
-    const week = zonedWeekDates(new Date(), snapshot.student.timezone);
+    const week = zonedWeekDates(calendarDate, snapshot.student.timezone);
     const sunday = week[0];
     for (const index of [0, 1, 6]) {
       await api(page, "/api/data", {

@@ -15,6 +15,20 @@ afterEach(() => {
 });
 
 describe("Supabase HTTP adapter", () => {
+  it("uses the atomic module balance endpoint", async () => {
+    vi.stubEnv("SUPABASE_URL", "https://project.supabase.co");
+    const fetch = vi.fn().mockResolvedValue(Response.json({ id: "module" }));
+    vi.stubGlobal("fetch", fetch);
+    await rpc("module_save", { initial_justified_absences: 1 }, "session", "exclunich_module_save");
+    expect(fetch).toHaveBeenCalledWith("https://project.supabase.co/rest/v1/rpc/exclunich_module_save", expect.objectContaining({ body: JSON.stringify({ p_action: "module_save", p_body: { initial_justified_absences: 1 }, p_credential: "session" }) }));
+  });
+  it("reports an unapplied balance migration without retrying a partial save", async () => {
+    vi.stubEnv("SUPABASE_URL", "https://project.supabase.co");
+    const fetch = vi.fn().mockResolvedValue(Response.json({ code: "PGRST202", message: "Function not found" }, { status: 404 }));
+    vi.stubGlobal("fetch", fetch);
+    await expect(rpc("module_save", {}, "session", "exclunich_module_save")).rejects.toMatchObject({ status: 503, code: "MIGRATION_REQUIRED" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it("excludes existing blocked classes even before database cleanup", async () => {
     vi.stubEnv("SUPABASE_URL", "https://project.supabase.co");
     const snapshot = createLocalDemo();

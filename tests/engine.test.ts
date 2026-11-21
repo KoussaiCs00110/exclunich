@@ -10,7 +10,7 @@ import {
   getAttendanceTrend,
   getAttendanceByType,
 } from "../src/lib/attendance";
-import { buildNotifications } from "../src/lib/notifications";
+import { buildNotifications, buildCurrentNotifications } from "../src/lib/notifications";
 import type {
   AppData,
   AttendanceStatus,
@@ -81,6 +81,55 @@ function fixture(statuses: AttendanceStatus[] = []): AppData {
 }
 const stats = (data: AppData, module = data.modules[0]) =>
   getModuleStats(module, data, NOW);
+
+describe("mid-semester starting balances", () => {
+  it("combines earlier and dated absences once without inventing an attendance denominator", () => {
+    const data = fixture(["present", "justified"]);
+    Object.assign(data.modules[0], { initial_justified_absences: 1, initial_unjustified_absences: 2 });
+    const before = structuredClone(data);
+    const current = stats(data);
+    expect(current).toMatchObject({ justified: 2, unjustified: 2, initialAbsences: 3, totalAbsences: 4, recorded: 2, scheduled: 2, completed: 2, unrecorded: 0, attendanceRate: 50, risk: "warning" });
+    expect(simulateAbsence(current, "unjustified").risk).toBe("excluded");
+    expect(simulateAbsence(current, "justified").risk).toBe("excluded");
+    expect(data).toEqual(before);
+    expect(getAttendanceTrend(data, "month", NOW)[0].absences).toBe(1);
+    expect(getAttendanceByType(data, NOW)[0].recorded).toBe(2);
+  });
+  it("recognizes an earlier exclusion with no recorded sessions", () => {
+    const data = fixture();
+    data.modules[0].initial_unjustified_absences = 3;
+    expect(stats(data)).toMatchObject({ totalAbsences: 3, risk: "excluded", attendanceRate: null, recorded: 0, scheduled: 0, unrecorded: 0 });
+    expect(getOverview(data, NOW)).toMatchObject({ totalAbsences: 3, initialAbsences: 3, excluded: 1 });
+  });
+  it("replaces a corrected starting balance and keeps dated corrections independent", () => {
+    const data = fixture(["unjustified"]);
+    data.modules[0].initial_unjustified_absences = 2;
+    expect(stats(data).risk).toBe("excluded");
+    data.modules[0].initial_unjustified_absences = 1;
+    expect(stats(data)).toMatchObject({ totalAbsences: 2, risk: "warning" });
+    data.attendance[0].attendance_status = "present";
+    expect(stats(data)).toMatchObject({ totalAbsences: 1, attendanceRate: 100, risk: "safe" });
+    data.modules[0].initial_unjustified_absences = 0;
+    expect(stats(data).totalAbsences).toBe(0);
+  });
+  it("keeps balances scoped to their module and preserves archived history", () => {
+    const data = fixture();
+    data.modules[0].initial_justified_absences = 4;
+    data.modules.push({ ...moduleA, id: "other", code: "OTHER" });
+    expect(stats(data, data.modules[1]).totalAbsences).toBe(0);
+    data.modules[0].archived_at = NOW.toISOString();
+    expect(getOverview(data, NOW).totalAbsences).toBe(0);
+    expect(stats(data).totalAbsences).toBe(4);
+  });
+  it("emits and reconciles starting-balance warnings for a newly added module", () => {
+    const after = fixture();
+    after.modules[0].initial_unjustified_absences = 2;
+    const before = { ...fixture(), modules: [] };
+    expect(buildNotifications(before, after, { now: NOW }).map((item) => item.type)).toContain("warning_unjustified");
+    expect(buildCurrentNotifications(after).map((item) => item.type)).toContain("warning_unjustified");
+    expect(buildNotifications(after, structuredClone(after), { now: NOW })).toEqual([]);
+  });
+});
 
 describe("central exclusion engine — required scenarios", () => {
   it("1 justified + 1 unjustified = SAFE", () =>

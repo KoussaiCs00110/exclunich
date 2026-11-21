@@ -13,7 +13,9 @@ export class ApiError extends Error {
   }
 }
 const globalDb = globalThis as unknown as { absentiaPool?: Pool };
-function mapDatabaseError(code: string | undefined, message: string): never {
+function mapDatabaseError(code: string | undefined, message: string, functionName?: string): never {
+  if (functionName === "exclunich_module_save" && ["42883", "PGRST202"].includes(code ?? ""))
+    throw new ApiError("Starting absence balances are not enabled yet. Ask the administrator to enable this feature. Your module has not been changed.", 503, "MIGRATION_REQUIRED");
   if (code === "28000") throw new ApiError(message, 401, "UNAUTHORIZED");
   if (code === "42501") throw new ApiError(message, 403, "ONBOARDING_REQUIRED");
   if (code === "P0002") throw new ApiError(message, 404, "NOT_FOUND");
@@ -51,7 +53,7 @@ export async function rpc<T = unknown>(
   action: string,
   body: Record<string, unknown> = {},
   credential: string | null = null,
-  functionName: "absentia_api" | "exclunich_sharing" = "absentia_api",
+  functionName: "absentia_api" | "exclunich_sharing" | "exclunich_module_save" = "absentia_api",
 ): Promise<T> {
   if (process.env.DATABASE_URL) {
     if (!globalDb.absentiaPool) {
@@ -64,16 +66,18 @@ export async function rpc<T = unknown>(
     }
     try {
       const result = await globalDb.absentiaPool.query(
-        functionName === "exclunich_sharing"
-          ? "select public.exclunich_sharing($1,$2::jsonb,$3) as data"
-          : "select public.absentia_api($1,$2::jsonb,$3) as data",
+        {
+          absentia_api: "select public.absentia_api($1,$2::jsonb,$3) as data",
+          exclunich_sharing: "select public.exclunich_sharing($1,$2::jsonb,$3) as data",
+          exclunich_module_save: "select public.exclunich_module_save($1,$2::jsonb,$3) as data",
+        }[functionName],
         [action, JSON.stringify(body), credential],
       );
       const data = result.rows[0].data;
       return (action === "snapshot" ? applyAcademicCalendar(data as AppData) : data) as T;
     } catch (error) {
       const e = error as { code?: string; message: string };
-      return mapDatabaseError(e.code, e.message);
+      return mapDatabaseError(e.code, e.message, functionName);
     }
   }
   const url = process.env.SUPABASE_URL
@@ -115,6 +119,7 @@ export async function rpc<T = unknown>(
       return mapDatabaseError(
         data.code,
         data.message || "Database request failed.",
+        functionName,
       );
     return (action === "snapshot" ? applyAcademicCalendar(data as AppData) : data) as T;
   } catch (error) {

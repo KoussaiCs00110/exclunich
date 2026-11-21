@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import type { AppData } from "@/lib/types";
 import {
   buildAuditNotifications,
+  buildCurrentNotifications,
   buildNotifications,
 } from "@/lib/notifications";
 import { credentialFromCookie, SESSION_COOKIE } from "@/lib/server/auth";
@@ -26,7 +27,7 @@ export async function GET() {
     // Reconcile current state as well as reminders. Unique keys make this safe after
     // an interrupted mutation/notification response or a temporary emission failure.
     const drafts = [
-      ...buildNotifications({ ...data, attendance: [] }, data),
+      ...buildCurrentNotifications(data),
       ...buildAuditNotifications(data),
     ];
     if (drafts.length) {
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     const input = dataSchema.parse(await readBody(request));
     if (await localDemoEnabled()) return success(await mutateLocalDemo(input));
     const credential = await credentialFromCookie();
-    const before = ["profile_save", "session_save", "occurrence_save", "attendance_save"].includes(input.action)
+    const before = ["profile_save", "session_save", "occurrence_save", "attendance_save", "module_save"].includes(input.action)
       ? await rpc<AppData>("snapshot", {}, credential)
       : null;
     if (input.action === "profile_save") {
@@ -99,7 +100,9 @@ export async function POST(request: NextRequest) {
       body.current_token_hash = secretHash(input.currentToken, "access");
       delete body.currentToken;
     }
-    const result = await rpc(input.action, body, credential);
+    const result = await rpc(input.action, body, credential,
+      input.action === "module_save" && (input.initial_justified_absences !== undefined || input.initial_unjustified_absences !== undefined)
+        ? "exclunich_module_save" : "absentia_api");
     if (input.action === "session_save") {
       // Also support deployed databases before the calendar trigger is installed.
       const after = await rpc<AppData>("snapshot", {}, credential);
@@ -118,7 +121,7 @@ export async function POST(request: NextRequest) {
       try {
         const after = await rpc<AppData>("snapshot", {}, credential);
         const drafts = [
-          ...buildNotifications({ ...after, attendance: [] }, after),
+          ...(before ? buildNotifications(before, after) : buildCurrentNotifications(after)),
           ...buildAuditNotifications(after),
         ];
         if (drafts.length)

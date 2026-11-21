@@ -213,6 +213,8 @@ export function importTimetableSnapshot(
         description: "",
         total_threshold: null,
         unjustified_threshold: null,
+        initial_justified_absences: 0,
+        initial_unjustified_absences: 0,
         archived_at: null,
         created_at: stamp,
       };

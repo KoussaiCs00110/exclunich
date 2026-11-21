@@ -1,6 +1,15 @@
 import { getModuleStats, getUpcomingSessions } from "./attendance";
 import type { AppData, NotificationDraft } from "./types";
 
+/** Rebuild current alerts after an interrupted request, including starting balances. */
+export function buildCurrentNotifications(data: AppData): NotificationDraft[] {
+  return buildNotifications({
+    ...data,
+    modules: data.modules.map((module) => ({ ...module, initial_justified_absences: 0, initial_unjustified_absences: 0 })),
+    attendance: [],
+  }, data);
+}
+
 /** Pure transition builder. Persist using a unique (student_id, dedup_key). */
 export function buildNotifications(
   before: AppData,
@@ -15,7 +24,7 @@ export function buildNotifications(
   for (const module of after.modules.filter((item) => !item.archived_at)) {
     const current = getModuleStats(module, after, now);
     const previousModule =
-      before.modules.find((item) => item.id === module.id) || module;
+      before.modules.find((item) => item.id === module.id) || { ...module, initial_justified_absences: 0, initial_unjustified_absences: 0 };
     const previous = getModuleStats(previousModule, before, now);
     const add = (type: string, title: string, message: string, suffix = "") =>
       drafts.push({

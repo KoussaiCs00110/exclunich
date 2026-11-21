@@ -143,10 +143,10 @@ export function getModuleStats(
   );
   const justified = records.filter(
     (record) => record.attendance_status === "justified",
-  ).length;
+  ).length + (module.initial_justified_absences ?? 0);
   const unjustified = records.filter(
     (record) => record.attendance_status === "unjustified",
-  ).length;
+  ).length + (module.initial_unjustified_absences ?? 0);
   const present = records.filter(
     (record) => record.attendance_status === "present",
   ).length;
@@ -157,6 +157,7 @@ export function getModuleStats(
   const risk = classifyRisk(justified, unjustified, limits);
   return {
     moduleId: module.id,
+    initialAbsences: (module.initial_justified_absences ?? 0) + (module.initial_unjustified_absences ?? 0),
     justified,
     unjustified,
     totalAbsences,
@@ -248,6 +249,7 @@ export function getOverview(data: AppData, now: Date | number = Date.now()) {
       | "justified"
       | "unjustified"
       | "totalAbsences"
+      | "initialAbsences"
       | "present"
       | "recorded"
       | "scheduled"
@@ -259,6 +261,7 @@ export function getOverview(data: AppData, now: Date | number = Date.now()) {
     totalModules: activeModules.length,
     scheduled: sum("scheduled"),
     totalAbsences: sum("totalAbsences"),
+    initialAbsences: sum("initialAbsences"),
     justified: sum("justified"),
     unjustified: sum("unjustified"),
     present,

@@ -107,6 +107,11 @@ export async function mutateLocalDemo(
       const moduleYear = id
         ? module().academic_year ?? data.student.academic_year
         : data.student.academic_year;
+      const previousModule = id ? module() : undefined;
+      const initialJustified = input.initial_justified_absences ?? previousModule?.initial_justified_absences ?? 0;
+      const initialUnjustified = input.initial_unjustified_absences ?? previousModule?.initial_unjustified_absences ?? 0;
+      if (![initialJustified, initialUnjustified].every((value) => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 1000))
+        throw new ApiError("Earlier absences must be whole numbers between 0 and 1000.");
       const values = {
         name: String(input.name),
         code: String(input.code),
@@ -116,6 +121,8 @@ export async function mutateLocalDemo(
         semester: String(input.semester),
         total_threshold: input.total_threshold as number | null,
         unjustified_threshold: input.unjustified_threshold as number | null,
+        initial_justified_absences: initialJustified as number,
+        initial_unjustified_absences: initialUnjustified as number,
       };
       if (
         data.modules.some(

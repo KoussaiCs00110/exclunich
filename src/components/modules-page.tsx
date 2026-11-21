@@ -59,6 +59,8 @@ export function ModuleEditor({
     color: module?.color || colors[0],
     total_threshold: module?.total_threshold?.toString() || "",
     unjustified_threshold: module?.unjustified_threshold?.toString() || "",
+    initial_justified_absences: String(module?.initial_justified_absences ?? 0),
+    initial_unjustified_absences: String(module?.initial_unjustified_absences ?? 0),
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -69,6 +71,7 @@ export function ModuleEditor({
     setBusy(true);
     setError("");
     try {
+      const includeInitial = module?.initial_justified_absences !== undefined || module?.initial_unjustified_absences !== undefined || Number(values.initial_justified_absences) !== 0 || Number(values.initial_unjustified_absences) !== 0;
       await mutate("module_save", {
         ...values,
         id: module?.id,
@@ -78,6 +81,8 @@ export function ModuleEditor({
         unjustified_threshold: values.unjustified_threshold
           ? Number(values.unjustified_threshold)
           : null,
+        initial_justified_absences: includeInitial ? Number(values.initial_justified_absences) : undefined,
+        initial_unjustified_absences: includeInitial ? Number(values.initial_unjustified_absences) : undefined,
       });
       toast.success(t(lang, module ? "module.updated" : "module.created"));
       onClose();
@@ -191,6 +196,21 @@ export function ModuleEditor({
               ))}
             </div>
           </div>
+          <fieldset className="span-2 initial-absence-fields" aria-describedby="initial-absence-help">
+            <legend>{t(lang, "module.initialTitle")}</legend>
+            <p id="initial-absence-help">{t(lang, "module.initialBody")}</p>
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="module-initial-justified">{t(lang, "module.initialJustified")}</label>
+                <input className="input" id="module-initial-justified" type="number" min={0} max={1000} step={1} value={values.initial_justified_absences} onChange={(e) => field("initial_justified_absences", e.target.value)} />
+              </div>
+              <div className="field">
+                <label htmlFor="module-initial-unjustified">{t(lang, "module.initialUnjustified")}</label>
+                <input className="input" id="module-initial-unjustified" type="number" min={0} max={1000} step={1} value={values.initial_unjustified_absences} onChange={(e) => field("initial_unjustified_absences", e.target.value)} />
+              </div>
+            </div>
+            <p className="initial-absence-fine-print">{t(lang, "module.initialRate")}</p>
+          </fieldset>
           <div className="field">
             <label htmlFor="module-total">
               {t(lang, "module.totalThreshold")}
@@ -379,6 +399,7 @@ export default function ModulesPage() {
                     <small>{t(lang, "sessions")}</small>
                   </div>
                 </div>
+                {stats.initialAbsences > 0 && <p className="initial-absence-summary">{t(lang, "module.initialSummary", { count: stats.initialAbsences })}</p>}
                 <div className="bar-caption">
                   <span>{t(lang, "risk.totalThreshold")}</span>
                   <span>
@@ -578,6 +599,12 @@ export function ModuleDetail({ id }: { id: string }) {
           </div>
         ))}
       </div>
+      {stats.initialAbsences > 0 && (
+        <div className="card initial-absence-notice">
+          <strong>{t(lang, "module.initialSummary", { count: stats.initialAbsences })}</strong>
+          <p>{t(lang, "module.initialRate")}</p>
+        </div>
+      )}
       <div className="module-details-grid">
         <div className="stack">
           <section className="card">

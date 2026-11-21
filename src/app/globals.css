@@ -1006,6 +1006,40 @@ textarea.input {
 .form-grid .span-2 {
   grid-column: 1/-1;
 }
+.initial-absence-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+}
+.initial-absence-fields legend {
+  padding: 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.initial-absence-fields p,
+.initial-absence-summary,
+.initial-absence-notice p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.initial-absence-fields .initial-absence-fine-print {
+  margin: 14px 0 0;
+  font-size: 12px;
+}
+.initial-absence-notice {
+  padding: 16px 20px;
+  margin-bottom: 22px;
+}
+.initial-absence-notice strong {
+  font-size: 14px;
+}
+.initial-absence-notice p {
+  margin: 6px 0 0;
+}
 .form-actions {
   display: flex;
   justify-content: flex-end;

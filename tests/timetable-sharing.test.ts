@@ -39,6 +39,8 @@ describe("timetable sharing privacy and import integrity", () => {
     data.student.full_name = "PRIVATE_NAME";
     data.modules[0].description = "PRIVATE_NOTE";
     data.attendance[0].note = "PRIVATE_ATTENDANCE";
+    data.modules[0].initial_justified_absences = 4;
+    data.modules[0].initial_unjustified_absences = 2;
     const encoded = JSON.stringify(buildTimetableSnapshot(data));
     for (const secret of [
       "PRIVATE_NAME",
@@ -48,6 +50,8 @@ describe("timetable sharing privacy and import integrity", () => {
       "threshold",
       "student_id",
       "student_identifier",
+      "initial_justified_absences",
+      "initial_unjustified_absences",
     ])
       expect(encoded).not.toContain(secret);
   });
@@ -87,6 +91,7 @@ describe("timetable sharing privacy and import integrity", () => {
         (m) => m.total_threshold === null && m.unjustified_threshold === null,
       ),
     ).toBe(true);
+    expect(result.data.modules.every((m) => m.initial_justified_absences === 0 && m.initial_unjustified_absences === 0)).toBe(true);
   });
   it("preserves cancellations", () => {
     const data = source();
@@ -116,6 +121,8 @@ describe("timetable sharing privacy and import integrity", () => {
         ...data.modules[0],
         id: target.student.id,
         total_threshold: 9,
+        initial_justified_absences: 1,
+        initial_unjustified_absences: 2,
         professor: "My professor",
       },
     ];
@@ -128,6 +135,7 @@ describe("timetable sharing privacy and import integrity", () => {
     );
     expect(result.data.modules[0].total_threshold).toBe(9);
     expect(result.data.modules[0].professor).toBe("My professor");
+    expect(result.data.modules[0]).toMatchObject({ initial_justified_absences: 1, initial_unjustified_absences: 2 });
     expect(result.data.attendance).toEqual(target.attendance);
     expect(result.modules_added).toBe(3);
   });

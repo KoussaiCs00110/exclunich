@@ -5,7 +5,7 @@ The same Next.js application works on either host. Supabase stores the data; the
 ## Supabase
 
 1. Create a Supabase project and open its SQL editor.
-2. For a new database, run all files in `supabase/migrations` in numbered order as project owner. For an existing database, run only pending migrations. After sharing, apply `202611210001_term_archiving.sql`, then `202611210002_academic_calendar.sql`. Do not rerun installed migrations on a populated project. The term migration preserves history and adds automatic archives; the calendar migration enforces the six 2026–2027 non-teaching periods for every student and cleans existing classes on those dates while preserving recorded attendance.
+2. For a new database, run all files in `supabase/migrations` in numbered order as project owner. For an existing database, run only pending migrations. After sharing, apply `202611210001_term_archiving.sql`, `202611210002_academic_calendar.sql`, then `202611210003_initial_absences.sql`. Do not rerun installed migrations on a populated project. These add term archives, shared non-teaching dates, and private starting absence balances. The starting-balance migration preserves existing modules with zero balances and adds an atomic server RPC with the same trusted execution grants as the existing API.
 3. Obtain the project URL and server secret key from the project's API settings. The `sb_secret_…` key is preferred; the legacy service-role JWT is also supported under `SUPABASE_SERVICE_ROLE_KEY`.
 4. Save a stable `TOKEN_PEPPER` generated with `openssl rand -hex 32`. Keep a secure backup; rotating this secret invalidates access tokens and recovery codes.
 
@@ -35,7 +35,7 @@ Enable managed database backups. Restrict host management access. Keep all datab
 
 ## Current verification boundary
 
-The production build, TypeScript check, 109 unit tests, offline and server-backed PostgreSQL suites, and fourteen desktop/mobile Chromium browser checks pass locally. Browser checks used the production standalone app and a restricted database runtime role. Calendar checks use separate student groups, verify excluded weeks and resumed classes, and confirm that each student keeps their own modules. Before database enforcement is installed, the app already applies the periods on reads and writes; an isolated test verified persisted cancellation with the SQL trigger disabled. Apply the pending calendar migration to enforce the rule for direct database RPCs and clean existing stored classes for every account. See [the verification record](verification.md) for scope and remaining target-device checks.
+The production build, TypeScript check, 118 unit tests, offline and server-backed PostgreSQL suites, and sixteen desktop/mobile Chromium browser checks pass locally. Browser checks use the production standalone app and a restricted runtime role. New checks verify starting-balance persistence, correction/reset, risk and notification updates, preserved dated attendance, and date-filtered statistics. The starting-balance migration must be applied before saving these balances; an absent migration produces an explicit error without a partial module save. The app already applies calendar exclusions while the calendar migration is pending, but that migration is still needed for direct database enforcement and stored-row cleanup. See [the verification record](verification.md) for scope and remaining target-device checks.
 
 ## Troubleshooting the setup message
 

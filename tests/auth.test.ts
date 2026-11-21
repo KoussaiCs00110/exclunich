@@ -97,6 +97,14 @@ const session = {
   recurrence_end: "2027-01-04",
 };
 describe("server input validation", () => {
+  it("accepts optional starting balances and rejects invalid counts", () => {
+    const module = { action: "module_save", name: "Networks", code: "NET", color: "#628b75", semester: "S3" };
+    expect(dataSchema.parse(module)).not.toHaveProperty("initial_justified_absences");
+    expect(dataSchema.parse({ ...module, initial_justified_absences: 0, initial_unjustified_absences: 1000 })).toHaveProperty("initial_unjustified_absences", 1000);
+    for (const field of ["initial_justified_absences", "initial_unjustified_absences"])
+      for (const value of [-1, 1.5, 1001, null, "2", Number.NaN])
+        expect(dataSchema.safeParse({ ...module, [field]: value }).success).toBe(false);
+  });
   it("requires a complete student profile and an explicit saved-secret acknowledgement", () => {
     expect(
       authSchema.safeParse({ action: "register", ...profile }).success,

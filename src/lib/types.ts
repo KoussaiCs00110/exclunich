@@ -40,6 +40,9 @@ export interface Module {
   academic_year?: string;
   total_threshold: number | null;
   unjustified_threshold: number | null;
+  /** Personal absence balances from before tracking; absent in legacy snapshots. */
+  initial_justified_absences?: number;
+  initial_unjustified_absences?: number;
   archived_at: string | null;
   created_at: string;
 }
@@ -134,6 +137,7 @@ export interface Thresholds {
 
 export interface ModuleStats {
   moduleId: string;
+  initialAbsences: number;
   justified: number;
   unjustified: number;
   totalAbsences: number;

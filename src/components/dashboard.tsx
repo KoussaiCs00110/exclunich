@@ -435,6 +435,7 @@ export default function Dashboard() {
                   })
                 : t(lang, "dashboard.unmarkedExplanation")}
             </p>
+            {overview.initialAbsences > 0 && <p className="help-caption">{t(lang, "module.initialSummary", { count: overview.initialAbsences })} {t(lang, "module.initialRate")}</p>}
           </section>
           <section className="card">
             <div className="card-header">

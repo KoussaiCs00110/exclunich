@@ -37,19 +37,22 @@ test("Sunday sessions are visible even with the legacy Sunday preference disable
       total_threshold: null,
       unjustified_threshold: null,
     });
-    const sunday = zonedWeekDates(new Date(), snapshot.student.timezone)[6];
-    await api(page, "/api/data", {
-      action: "session_save",
-      module_id: module.id,
-      session_type: "TD",
-      weekday: 7,
-      start_time: "09:00",
-      end_time: "10:00",
-      classroom: "Sunday Room",
-      professor: "",
-      recurrence_start: sunday,
-      recurrence_end: sunday,
-    });
+    const week = zonedWeekDates(new Date(), snapshot.student.timezone);
+    const sunday = week[0];
+    for (const index of [0, 1, 6]) {
+      await api(page, "/api/data", {
+        action: "session_save",
+        module_id: module.id,
+        session_type: "TD",
+        weekday: index || 7,
+        start_time: "09:00",
+        end_time: "10:00",
+        classroom: index === 0 ? "Sunday Room" : "Weekday Room",
+        professor: "",
+        recurrence_start: week[index],
+        recurrence_end: week[index],
+      });
+    }
 
     for (let visit = 0; visit < 2; visit++) {
       await page.goto("/timetable");
@@ -58,18 +61,37 @@ test("Sunday sessions are visible even with the legacy Sunday preference disable
         await expect(
           page.locator(`.fc-list-day[data-date="${sunday}"]`),
         ).toBeVisible();
+        await expect
+          .poll(() =>
+            page.locator(".fc-list-day").evaluateAll((days) =>
+              days.map((day) => day.getAttribute("data-date")),
+            ),
+          )
+          .toEqual([week[0], week[1], week[6]]);
       } else {
         await expect(page.locator(".fc-col-header-cell")).toHaveCount(7);
         await expect(
           page.locator(`.fc-col-header-cell[data-date="${sunday}"]`),
         ).toBeVisible();
+        await expect
+          .poll(() =>
+            page.locator(".fc-col-header-cell").evaluateAll((days) =>
+              days.map((day) => day.getAttribute("data-date")),
+            ),
+          )
+          .toEqual(week);
       }
       await expect(
-        page.locator(".calendar-event-content strong", {
-          hasText: "Sunday Networks",
-        }),
+        page
+          .locator(".calendar-event-content strong", {
+            hasText: "Sunday Networks",
+          })
+          .first(),
       ).toBeVisible();
-      await page.locator(".fc-event", { hasText: "Sunday Networks" }).click();
+      await page
+        .locator(".fc-event", { hasText: "Sunday Networks" })
+        .first()
+        .click();
       await expect(page.locator(".session-panel")).toContainText("Sunday Room");
       await page.keyboard.press("Escape");
     }
@@ -301,10 +323,7 @@ test("classmates share, import and revoke a timetable without sharing attendance
       total_threshold: 8,
       unjustified_threshold: 4,
     });
-    const weekday = new Date().getUTCDay() || 7;
-    const date = new Date(Date.now() - (weekday + 6) * 86400000)
-      .toISOString()
-      .slice(0, 10);
+    const date = zonedWeekDates(Date.now() - 7 * 86400000)[1];
     await api(page, "/api/data", {
       action: "session_save",
       module_id: module.id,

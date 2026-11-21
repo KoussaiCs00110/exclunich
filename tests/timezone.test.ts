@@ -31,19 +31,20 @@ describe("Africa/Algiers and IANA timezone handling", () => {
       "Fri, 20 Nov · 08:30",
     );
   });
-  it("includes all seven days through Sunday in the local week", () => {
+  it("orders the local week from Sunday through Saturday", () => {
     expect(zonedWeekDates("2026-11-22T12:00:00Z")).toEqual([
-      "2026-11-16",
-      "2026-11-17",
-      "2026-11-18",
-      "2026-11-19",
-      "2026-11-20",
-      "2026-11-21",
       "2026-11-22",
+      "2026-11-23",
+      "2026-11-24",
+      "2026-11-25",
+      "2026-11-26",
+      "2026-11-27",
+      "2026-11-28",
     ]);
   });
-  it("chooses the next week when the local Monday starts before UTC Monday", () => {
-    expect(zonedWeekDates("2026-11-22T23:30:00Z")[0]).toBe("2026-11-23");
+  it("chooses the next week when local Sunday starts before UTC Sunday", () => {
+    expect(zonedWeekDates("2026-11-21T23:30:00Z")[0]).toBe("2026-11-22");
+    expect(zonedWeekDates("2026-11-21T22:30:00Z")[0]).toBe("2026-11-15");
   });
   it("handles ISO week/year boundaries", () => {
     expect(formatInZone("2027-01-01T12:00:00Z", "RRRR-'W'II")).toBe("2026-W53");

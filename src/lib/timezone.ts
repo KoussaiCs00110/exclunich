@@ -147,10 +147,10 @@ export function zonedWeekDates(
   timezone = DEFAULT_TIMEZONE,
 ): string[] {
   const key = localDateKey(anchor, timezone);
-  const monday = new Date(`${key}T12:00:00Z`);
-  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+  const sunday = new Date(`${key}T12:00:00Z`);
+  sunday.setUTCDate(sunday.getUTCDate() - sunday.getUTCDay());
   return Array.from({ length: 7 }, (_, index) => {
-    const day = new Date(monday);
+    const day = new Date(sunday);
     day.setUTCDate(day.getUTCDate() + index);
     return day.toISOString().slice(0, 10);
   });

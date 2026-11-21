@@ -19,6 +19,7 @@ Checked on 21 November 2026.
 - Replaced the calendar's icon-font navigation with text arrows, which render under the existing font policy. Removed the shared Agenda label override so mobile Week and Day controls are distinct. Moved module names beside session types so compact calendar events retain their titles.
 - Normalized Supabase project and Data API URL formats so `/rest/v1/` is included exactly once. Trimmed pasted API keys while preserving legacy service-role authorization. Seven adapter tests, the full unit suite, TypeScript and the production build pass after this change.
 - Made Sunday visible for existing and new accounts without a database migration, removed the preference that hides Sunday, and made the timezone week helper return seven days. Desktop and mobile browser tests verify Sunday session visibility and details across repeated visits with the old profile flag disabled.
+- Set the weekly timetable and mobile agenda to start on Sunday and end on Saturday. Calendar tests verify desktop column order and the order of Sunday, Monday and Saturday sessions in the mobile agenda; timezone tests cover the local Sunday midnight boundary.
 
 ## Repeat the browser checks
 

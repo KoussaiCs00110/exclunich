@@ -385,7 +385,7 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
                 locale={lang === "fr" ? frLocale : "en"}
                 initialView="timeGridWeek"
                 timeZone={timezone}
-                firstDay={1}
+                firstDay={0}
                 hiddenDays={[]}
                 allDaySlot={false}
                 slotMinTime="07:00:00"

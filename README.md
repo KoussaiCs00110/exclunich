@@ -60,7 +60,7 @@ Browser → Next.js protected pages / JSON route handlers
 
 The relational model separates weekly session templates from concrete dated occurrences. An attendance record references exactly one occurrence. A composite owner/module foreign key prevents linking another student's records. Cancelled occurrences and cancelled attendance never count. Future occurrences are excluded from actual attendance totals. Unrecorded sessions remain visible and do not invent absences or presence.
 
-The timetable includes all seven days, including Sunday, for every account. Older profile settings cannot hide Sunday sessions. Weekly and daily views, the mobile agenda and session details use the same complete schedule.
+The timetable runs from Sunday through Saturday for every account. Older profile settings cannot hide Sunday sessions. Weekly and daily views, the mobile agenda and session details use the same complete schedule.
 
 Session creation materializes weekly occurrences for the selected date range, up to 366 days. Editing a series preserves recorded occurrences as historical entries and rebuilds unrecorded occurrences. Changing the profile timezone preserves existing absolute occurrence timestamps; rebuilding a series interprets its local times in the newly selected timezone. Moving or resizing a single occurrence preserves its identity; recorded occurrences must have their attendance removed before rescheduling. Deleting a module or series removes its linked sessions and attendance, so the interface requires a confirmation.
 

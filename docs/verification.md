@@ -4,7 +4,7 @@ Checked on 21 November 2026.
 
 ## Passed
 
-- 84 automated tests across seven files: timetable sharing privacy and imports, local demo isolation and persistence, exclusion rules and simulator, corrections and module isolation, timezone and conflicts, token generation and hashing, recovery derivation, input validation, CSRF and request limits, trusted proxy handling, notification reconciliation, CSV safety, and multipage Unicode PDF generation.
+- 91 automated tests across eight files: timetable sharing privacy and imports, local demo isolation and persistence, exclusion rules and simulator, corrections and module isolation, timezone and conflicts, token generation and hashing, recovery derivation, input validation, CSRF and request limits, trusted proxy handling, notification reconciliation, CSV safety, multipage Unicode PDF generation, and Supabase HTTP URL/key handling.
 - Fresh PostgreSQL 18 migration and transactional security suite using an isolated single-user database: registration gate, tenant ownership, occurrence generation, future attendance rejection, duplicate correction handling, audit records, token/session revocation, pending recovery retry and replay rejection, notification deduplication, rate counters, schema privileges, and account deletion. The sharing suite also verifies cohort boundaries, snapshot field privacy, copied occurrence identity, preserved personal settings, duplicate imports across multiple tokens, expiry, owner-only revocation, and RLS configuration. Fixtures do not populate the application.
 - TypeScript check and production Turbopack build, including standalone asset packaging. The earlier sandbox failure was resolved by allowing worker sockets and starting with a clean build cache.
 - Locked dependencies installed in a separate temporary directory with `npm ci --ignore-scripts --offline`. This checks lockfile consistency; package lifecycle scripts were skipped.
@@ -17,6 +17,7 @@ Checked on 21 November 2026.
 - Corrected the attendance-history browser assertion to select the visible desktop table or mobile cards.
 - Added two-account timetable-sharing browser coverage and optional `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` support for an installed Chromium binary.
 - Replaced the calendar's icon-font navigation with text arrows, which render under the existing font policy. Removed the shared Agenda label override so mobile Week and Day controls are distinct. Moved module names beside session types so compact calendar events retain their titles.
+- Normalized Supabase project and Data API URL formats so `/rest/v1/` is included exactly once. Trimmed pasted API keys while preserving legacy service-role authorization. Seven adapter tests, the full unit suite, TypeScript and the production build pass after this change.
 
 ## Repeat the browser checks
 

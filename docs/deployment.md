@@ -9,6 +9,8 @@ The same Next.js application works on either host. Supabase stores the data; the
 3. Obtain the project URL and server secret key from the project's API settings. The `sb_secret_…` key is preferred; the legacy service-role JWT is also supported under `SUPABASE_SERVICE_ROLE_KEY`.
 4. Save a stable `TOKEN_PEPPER` generated with `openssl rand -hex 32`. Keep a secure backup; rotating this secret invalidates access tokens and recovery codes.
 
+Use the project origin for `SUPABASE_URL`, for example `https://your-project.supabase.co`. The HTTP adapter also accepts a pasted Data API URL ending in `/rest/v1/` and normalizes it before building RPC URLs.
+
 ## Vercel
 
 1. Push this repository to your Git provider, then import it into Vercel. Select the Next.js framework and this directory as the project root.
@@ -33,4 +35,8 @@ Enable managed database backups. Restrict host management access. Keep all datab
 
 ## Current verification boundary
 
-The production build, TypeScript check, 84 unit tests, offline and server-backed PostgreSQL suites, and six desktop/mobile Chromium browser checks pass locally. Browser checks used the production standalone app and a restricted database runtime role. Login, populated dashboard, history and timetable screenshots were also inspected. See [the verification record](verification.md) for scope and repeatable commands. The source includes both platform configurations, but neither hosting account nor a live Supabase project has been verified. Complete the target HTTPS and manual checks before student use.
+The production build, TypeScript check, 91 unit tests, offline and server-backed PostgreSQL suites, and six desktop/mobile Chromium browser checks pass locally. Browser checks used the production standalone app and a restricted database runtime role. Login, populated dashboard, history and timetable screenshots were also inspected. See [the verification record](verification.md) for scope and repeatable commands. The source includes both platform configurations; successful registration and persistence against the hosted deployment's Supabase configuration still need verification. Complete the target HTTPS and manual checks before student use.
+
+## Troubleshooting the setup message
+
+The login page's generic setup message can also indicate a database connection failure. In Vercel's Production environment, confirm the project URL, a current active server secret key, a stable `TOKEN_PEPPER` and the exact HTTPS `APP_URL`. Leave `DATABASE_URL` unset when using Supabase HTTP. Supabase's API-key settings are separate from Vercel's environment: after rotating a key, update `SUPABASE_SECRET_KEY` in Vercel and redeploy. A deleted or revoked key cannot authenticate even when the database migrations are installed.

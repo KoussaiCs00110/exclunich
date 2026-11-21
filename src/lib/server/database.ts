@@ -73,9 +73,13 @@ export async function rpc<T = unknown>(
       return mapDatabaseError(e.code, e.message);
     }
   }
-  const url = process.env.SUPABASE_URL;
+  const url = process.env.SUPABASE_URL
+    ?.trim()
+    .replace(/\/+$/, "")
+    .replace(/\/rest\/v1$/, "");
   const key =
-    process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!url || !key)
     throw new ApiError(
       "Database setup is required. Configure Supabase or a PostgreSQL connection to begin.",
@@ -84,7 +88,7 @@ export async function rpc<T = unknown>(
     );
   try {
     const response = await fetch(
-      `${url.replace(/\/$/, "")}/rest/v1/rpc/${functionName}`,
+      `${url}/rest/v1/rpc/${functionName}`,
       {
         method: "POST",
         headers: {

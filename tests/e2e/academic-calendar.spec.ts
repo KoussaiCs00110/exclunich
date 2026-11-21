@@ -53,8 +53,27 @@ test("academic breaks apply to different students without sharing their classes"
       await expect(page.locator(".fc-event")).toHaveCount(1);
       await page.locator(".fc-next-button").click();
       await expect(page.locator(".fc-event")).toHaveCount(0);
+      await expect(page.locator(".timetable-period-notice")).toContainText("Test 1");
+      await expect(page.locator(".timetable-period-notice")).toContainText("28/11/2026 – 03/12/2026");
+      if (page.viewportSize()!.width > 720) {
+        await expect(page.locator('.fc-col-header-cell[data-date="2026-12-03"] .calendar-period-badge')).toHaveText("Test 1");
+        await expect(page.locator('.fc-col-header-cell[data-date="2026-12-04"] .calendar-period-badge')).toHaveCount(0);
+        await expect(page.locator(".fc-timegrid-col.calendar-period-day")).toHaveCount(5);
+      } else {
+        await expect(page.locator(".fc-list-empty")).toContainText("Test 1");
+      }
       await page.locator(".fc-next-button").click();
       await expect(page.locator(".fc-event")).toHaveCount(1);
+      await expect(page.locator(".timetable-period-notice")).toHaveCount(0);
+      if (number === 1) {
+        for (let week = 0; week < 2; week++) await page.locator(".fc-next-button").click();
+        await expect(page.locator(".timetable-period-notice.period-holiday")).toContainText("Winter holidays (WH)");
+        for (let week = 0; week < 3; week++) await page.locator(".fc-next-button").click();
+        await expect(page.locator(".timetable-period-notice.period-exam")).toContainText("January exams");
+        await expect(page.locator(".timetable-period-notice")).toContainText("09/01/2027 – 14/01/2027");
+        await page.locator(".fc-next-button").click();
+        await expect(page.locator(".timetable-period-notice")).toHaveCount(0);
+      }
     } finally {
       expect((await request(page, { action: "account_delete", currentToken: account.token, confirmation: "DELETE" })).ok()).toBeTruthy();
     }

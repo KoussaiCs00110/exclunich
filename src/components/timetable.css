@@ -71,6 +71,69 @@
   color: var(--muted, #8997af);
   font-size: 0.8125rem;
 }
+.period-test {
+  --period-color: var(--amber);
+}
+.period-exam {
+  --period-color: var(--red);
+}
+.period-holiday {
+  --period-color: var(--primary);
+}
+.timetable-period-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.4rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--period-color) 30%, var(--border));
+  background: color-mix(in srgb, var(--period-color) 9%, var(--surface));
+}
+.timetable-period-notice > svg {
+  color: var(--period-color);
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+.timetable-period-notice > div {
+  min-width: 0;
+}
+.timetable-period-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.8rem;
+}
+.timetable-period-heading strong {
+  color: var(--period-color);
+  font-size: 0.9375rem;
+}
+.timetable-period-heading span,
+.timetable-period-notice p {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.timetable-period-notice p {
+  margin: 0.35rem 0 0;
+}
+.calendar-day-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+.calendar-period-badge {
+  color: var(--period-color);
+  background: color-mix(in srgb, var(--period-color) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--period-color) 35%, transparent);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.timetable-calendar .fc .calendar-period-day {
+  background: color-mix(in srgb, var(--period-color) 7%, transparent);
+}
 .timetable-calendar {
   padding: 1.25rem 1.25rem 0;
 }
@@ -871,6 +934,9 @@
   .timetable-filters {
     padding: 1rem;
     gap: 0.5rem;
+  }
+  .timetable-period-notice {
+    padding: 1rem;
   }
   .timetable-filter-label {
     display: none;

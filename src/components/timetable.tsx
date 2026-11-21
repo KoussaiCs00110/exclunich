@@ -28,7 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { getModuleStats, simulateAbsence } from "@/lib/attendance";
-import { ACADEMIC_PERIODS, isNonTeachingOccurrence } from "@/lib/academic-calendar";
+import { ACADEMIC_PERIODS, academicPeriodForDate, isNonTeachingOccurrence } from "@/lib/academic-calendar";
 import type { AppData, Occurrence } from "@/lib/types";
 import { SessionPanel } from "./session-panel";
 import { Modal } from "./modal";
@@ -72,6 +72,10 @@ function addCalendarDays(date: string, days: number) {
   return value.toISOString().slice(0, 10);
 }
 
+function periodKind(code: string) {
+  return code.startsWith("test") ? "test" : code.startsWith("exam") ? "exam" : "holiday";
+}
+
 function overlap(
   data: AppData,
   startsAt: string,
@@ -105,12 +109,20 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [mobile, setMobile] = useState(false);
+  const [visibleDates, setVisibleDates] = useState<{ start: string; end: string } | null>(null);
   const timezone = data.student.timezone || "Africa/Algiers";
   const lang = data.student.language;
   const phrase = (en: string, fr: string) => (lang === "fr" ? fr : en);
   const modules = data.modules.filter((module) => !module.archived_at);
   const selected = data.occurrences.find(
     (occurrence) => occurrence.id === selectedId,
+  );
+  const visiblePeriods = ACADEMIC_PERIODS.filter(
+    (period) => visibleDates && period.start <= visibleDates.end && period.end >= visibleDates.start,
+  );
+  const suspendedMessage = phrase(
+    "No regular classes during this period. Your timetable resumes afterward.",
+    "Pas de séances habituelles pendant cette période. Votre emploi du temps reprend ensuite.",
   );
 
   useEffect(() => {
@@ -388,6 +400,20 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
               </label>
               <span className="timetable-timezone">{timezone}</span>
             </div>
+            <div className="timetable-period-notices" role="status" aria-live="polite">
+              {visiblePeriods.map((period) => (
+                <div className={`timetable-period-notice period-${periodKind(period.code)}`} key={period.code}>
+                  <CalendarDays size={21} aria-hidden="true" />
+                  <div>
+                    <div className="timetable-period-heading">
+                      <strong>{period[lang]}</strong>
+                      <span>{period.start.split("-").reverse().join("/")} – {period.end.split("-").reverse().join("/")}</span>
+                    </div>
+                    <p>{suspendedMessage}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
             <div className="timetable-calendar" aria-busy={busy}>
               <FullCalendar
                 ref={calendarRef}
@@ -420,6 +446,28 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
                   hour12: false,
                 }}
                 dayHeaderFormat={{ weekday: "short", day: "numeric" }}
+                dayHeaderContent={(info) => {
+                  const period = academicPeriodForDate(formatInTimeZone(info.date, timezone, "yyyy-MM-dd"));
+                  return (
+                    <span className="calendar-day-heading">
+                      <span>{info.text}</span>
+                      {period && (
+                        <span className={`calendar-period-badge period-${periodKind(period.code)}`} title={period[lang]} aria-label={period[lang]}>
+                          {periodKind(period.code) === "exam" ? phrase("Exam", "Examens") : periodKind(period.code) === "test" ? period[lang] : period.code.toUpperCase()}
+                        </span>
+                      )}
+                    </span>
+                  );
+                }}
+                dayCellClassNames={(info) => {
+                  const period = academicPeriodForDate(formatInTimeZone(info.date, timezone, "yyyy-MM-dd"));
+                  return period ? ["calendar-period-day", `period-${periodKind(period.code)}`] : [];
+                }}
+                datesSet={(info) => {
+                  const start = formatInTimeZone(info.start, timezone, "yyyy-MM-dd");
+                  const end = formatInTimeZone(new Date(info.end.getTime() - 1), timezone, "yyyy-MM-dd");
+                  setVisibleDates((previous) => previous?.start === start && previous.end === end ? previous : { start, end });
+                }}
                 headerToolbar={{
                   left: "prev,next today",
                   center: "title",
@@ -467,10 +515,12 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
                 eventResize={moveEvent}
                 eventMinHeight={68}
                 height="auto"
-                noEventsContent={phrase(
-                  "No sessions this week. Add a session to start building your timetable.",
-                  "Aucune séance cette semaine. Ajoutez une séance à votre emploi du temps.",
-                )}
+                noEventsContent={visiblePeriods.length > 0
+                  ? `${visiblePeriods.map((period) => period[lang]).join(" · ")}. ${suspendedMessage}`
+                  : phrase(
+                    "No sessions in this view. Add a session to start building your timetable.",
+                    "Aucune séance dans cette vue. Ajoutez une séance à votre emploi du temps.",
+                  )}
                 dayMaxEvents={false}
                 eventDidMount={(info: EventMountArg) => {
                   info.el.setAttribute(

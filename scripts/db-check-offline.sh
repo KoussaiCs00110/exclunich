@@ -16,5 +16,10 @@ if ! rg -q 'PASS: all database workflow and security assertions completed' "$clu
 postgres --single -j -c absentia.offline=on -D "$cluster_dir/data" postgres < "$project_root/scripts/db-sharing-test.sql" > "$cluster_dir/sharing.log" 2>&1
 if rg -q 'ERROR|FATAL' "$cluster_dir/sharing.log"; then cat "$cluster_dir/sharing.log"; exit 1; fi
 if ! rg -q 'PASS: timetable sharing' "$cluster_dir/sharing.log"; then cat "$cluster_dir/sharing.log"; exit 1; fi
+# Single-user -j mode needs an empty line after its final command.
+{ cat "$project_root/scripts/db-term-test.sql"; printf '\n'; } | postgres --single -j -c absentia.offline=on -D "$cluster_dir/data" postgres > "$cluster_dir/term.log" 2>&1
+if rg -q 'ERROR|FATAL' "$cluster_dir/term.log"; then cat "$cluster_dir/term.log"; exit 1; fi
+if ! rg -q 'PASS: term archiving' "$cluster_dir/term.log"; then cat "$cluster_dir/term.log"; exit 1; fi
 printf 'PASS: real PostgreSQL migration, authentication, recovery, isolation, attendance, rate limits, RLS configuration and deletion (effective-role RLS requires a server).\n'
 printf 'PASS: timetable sharing, privacy, cohort restrictions, duplication, expiry and revocation.\n'
+printf 'PASS: automatic term archiving, transaction rollback, preserved history and academic-year isolation.\n'

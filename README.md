@@ -27,7 +27,7 @@ Set these values in `.env.local`:
 - `APP_URL`: `http://localhost:3000` for development; the exact HTTPS origin in production.
 - `SUPABASE_URL` and `SUPABASE_SECRET_KEY`: the project's URL and **server secret** API key. The older JWT service-role key can instead be supplied as `SUPABASE_SERVICE_ROLE_KEY`.
 
-For a new project, apply both SQL files in `supabase/migrations` in numbered order using the Supabase SQL editor as database owner. For an existing installation, apply only [the new sharing migration](supabase/migrations/202611200002_timetable_sharing.sql); do not rerun the foundation migration. This installs the schema, constraints, indexes, RLS and the restricted `absentia_api` RPC. There are no public browser credentials to configure.
+For a new project, apply all SQL files in `supabase/migrations` in numbered order using the Supabase SQL editor as database owner. For an existing installation, apply only pending migrations; do not rerun the foundation or sharing migration. Install [automatic term archiving](supabase/migrations/202611210001_term_archiving.sql) after the sharing migration. This installs the schema, constraints, indexes, RLS and restricted RPCs. There are no public browser credentials to configure.
 
 ```bash
 npm run dev
@@ -61,6 +61,10 @@ Browser → Next.js protected pages / JSON route handlers
 The relational model separates weekly session templates from concrete dated occurrences. An attendance record references exactly one occurrence. A composite owner/module foreign key prevents linking another student's records. Cancelled occurrences and cancelled attendance never count. Future occurrences are excluded from actual attendance totals. Unrecorded sessions remain visible and do not invent absences or presence.
 
 The timetable runs from Sunday through Saturday for every account. Older profile settings cannot hide Sunday sessions. Weekly and daily views, the mobile agenda and session details use the same complete schedule.
+
+Changing the saved semester or academic year automatically archives all currently active modules and their timetable in the same database transaction as the profile update. Sessions, occurrences, attendance and notes stay saved and remain available through Archived modules and Attendance History. The active timetable and dashboard start empty; add or import the new term's schedule using the same account. Saving unchanged term fields or editing other settings does not archive anything.
+
+Modules retain their academic year, allowing the same module code and semester in a later year. The term-archiving migration assigns existing modules the owner's currently saved year because earlier records did not store one. Apply this migration before enabling term changes on an existing deployment; the server blocks changes to an active legacy timetable until the migration is installed.
 
 Session creation materializes weekly occurrences for the selected date range, up to 366 days. Editing a series preserves recorded occurrences as historical entries and rebuilds unrecorded occurrences. Changing the profile timezone preserves existing absolute occurrence timestamps; rebuilding a series interprets its local times in the newly selected timezone. Moving or resizing a single occurrence preserves its identity; recorded occurrences must have their attendance removed before rescheduling. Deleting a module or series removes its linked sessions and attendance, so the interface requires a confirmation.
 

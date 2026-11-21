@@ -352,7 +352,8 @@ export default function ModulesPage() {
                 </div>
                 <Link href={`/modules/${module.id}`}>
                   <div className="module-code">
-                    {module.code} · {semesterLabel(module.semester, lang)}
+                    {module.code} · {module.academic_year && `${module.academic_year} · `}
+                    {semesterLabel(module.semester, lang)}
                   </div>
                   <h2>{module.name}</h2>
                 </Link>
@@ -530,7 +531,8 @@ export function ModuleDetail({ id }: { id: string }) {
           <div className="row" style={{ marginBottom: 7 }}>
             <ModuleIcon module={module} />
             <span className="eyebrow" style={{ marginBottom: 0 }}>
-              {module.code} · {semesterLabel(module.semester, lang)}
+              {module.code} · {module.academic_year && `${module.academic_year} · `}
+              {semesterLabel(module.semester, lang)}
             </span>
             <RiskBadge stats={stats} />
           </div>

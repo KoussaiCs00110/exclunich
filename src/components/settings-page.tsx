@@ -117,9 +117,19 @@ export function SettingsPage() {
       setBusy(true);
       setError("");
       try {
+        const changingTerm =
+          values.semester !== data.student.semester ||
+          values.academic_year !== data.student.academic_year;
         await mutate("profile_save", values);
         reset(values);
-        toast.success(phrase("Settings saved", "Paramètres enregistrés"));
+        toast.success(
+          changingTerm
+            ? phrase(
+                "New term saved. Previous modules and timetable archived.",
+                "Nouvelle période enregistrée. Les anciens modules et l’emploi du temps ont été archivés.",
+              )
+            : phrase("Settings saved", "Paramètres enregistrés"),
+        );
       } catch (cause) {
         setError(
           cause instanceof Error
@@ -310,6 +320,12 @@ export function SettingsPage() {
                       ))}
                     </select>
                   </div>
+                  <p className="muted span-2">
+                    {phrase(
+                      "Changing your semester or academic year automatically archives your current modules and timetable. Your attendance history stays saved. Add or import the new term’s modules and sessions afterward.",
+                      "Changer de semestre ou d’année universitaire archive automatiquement vos modules et votre emploi du temps actuels. Votre historique de présence est conservé. Ajoutez ou importez ensuite les modules et séances de la nouvelle période.",
+                    )}
+                  </p>
                   <div className="field">
                     <label htmlFor="settings-department">
                       {t(lang, "department")}

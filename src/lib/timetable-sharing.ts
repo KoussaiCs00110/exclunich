@@ -66,7 +66,12 @@ export function buildTimetableSnapshot(data: AppData): TimetableSnapshot {
   const { group_name, department, academic_year, semester, timezone } =
     data.student;
   const modules = data.modules
-    .filter((m) => !m.archived_at && m.semester === semester)
+    .filter(
+      (m) =>
+        !m.archived_at &&
+        m.semester === semester &&
+        (m.academic_year ?? academic_year) === academic_year,
+    )
     .map(({ id, name, code, professor, color, semester }) => ({
       id,
       name,
@@ -183,7 +188,11 @@ export function importTimetableSnapshot(
     )
       continue;
     let own = data.modules.find(
-      (m) => m.code === source.code && m.semester === target.student.semester,
+      (m) =>
+        m.code === source.code &&
+        m.semester === target.student.semester &&
+        (m.academic_year ?? target.student.academic_year) ===
+          target.student.academic_year,
     );
     if (
       own &&
@@ -197,6 +206,7 @@ export function importTimetableSnapshot(
       own = {
         ...source,
         semester: target.student.semester,
+        academic_year: target.student.academic_year,
         id: randomUUID(),
         description: "",
         total_threshold: null,

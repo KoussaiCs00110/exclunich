@@ -37,6 +37,7 @@ export interface Module {
   description: string | null;
   color: string;
   semester: string;
+  academic_year?: string;
   total_threshold: number | null;
   unjustified_threshold: number | null;
   archived_at: string | null;

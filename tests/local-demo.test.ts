@@ -169,4 +169,51 @@ describe("persistent local demo workflows", () => {
     expect(created).toHaveLength(3);
     expect(created[0].starts_at).toBe("2026-11-23T07:00:00.000Z");
   });
+  it.each(["semester", "academic_year"] as const)(
+    "archives the timetable on a %s change without deleting attendance",
+    async (field) => {
+      const before = await localDemoSnapshot();
+      await mutateLocalDemo({
+        action: "profile_save",
+        ...before.student,
+        [field]: field === "semester" ? "Semester 2" : "2027–2028",
+      });
+      const after = await localDemoSnapshot();
+      expect(after.modules.every((module) => module.archived_at)).toBe(true);
+      expect(after.modules.every((module) => module.academic_year === before.student.academic_year)).toBe(true);
+      expect(after.sessions).toEqual(before.sessions);
+      expect(after.occurrences).toEqual(before.occurrences);
+      expect(after.attendance).toEqual(before.attendance);
+      expect(getOverview(after).totalModules).toBe(0);
+    },
+  );
+  it("keeps new modules active on repeated saves and permits codes in a new year", async () => {
+    const before = await localDemoSnapshot();
+    const profile = { ...before.student, academic_year: "2027–2028" };
+    await mutateLocalDemo({ action: "profile_save", ...profile });
+    const result = (await mutateLocalDemo({
+      action: "module_save",
+      ...before.modules[0],
+      id: undefined,
+    })) as { id: string };
+    await mutateLocalDemo({ action: "profile_save", ...profile, full_name: "Updated name" });
+    const after = await localDemoSnapshot();
+    expect(after.modules.find((module) => module.id === result.id)).toMatchObject({
+      archived_at: null,
+      academic_year: "2027–2028",
+    });
+    expect(after.attendance).toEqual(before.attendance);
+  });
+  it("does not archive modules on ordinary settings changes or failed profile saves", async () => {
+    const before = await localDemoSnapshot();
+    await mutateLocalDemo({ action: "profile_save", ...before.student, theme: "light" });
+    expect((await localDemoSnapshot()).modules).toEqual(before.modules);
+    await expect(mutateLocalDemo({
+      action: "profile_save",
+      ...before.student,
+      semester: "Semester 2",
+      timezone: "Invalid/Timezone",
+    })).rejects.toThrow("valid timezone");
+    expect((await localDemoSnapshot()).modules).toEqual(before.modules);
+  });
 });

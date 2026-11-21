@@ -129,6 +129,28 @@ describe("timetable sharing privacy and import integrity", () => {
     ).toThrow("already used");
     expect(JSON.stringify(target)).toBe(before);
   });
+  it("does not share restored modules belonging to another academic year", () => {
+    const data = source();
+    data.modules[0].academic_year = "2025–2026";
+    const snapshot = buildTimetableSnapshot(data);
+    expect(snapshot.modules.some((module) => module.id === data.modules[0].id)).toBe(false);
+    expect(snapshot.sessions.some((session) => session.module_id === data.modules[0].id)).toBe(false);
+  });
+  it("imports a new-year module without conflicting with a same-code archive", () => {
+    const data = source();
+    const target = recipient();
+    const old = {
+      ...data.modules[0],
+      academic_year: "2025–2026",
+      archived_at: "2026-01-01T00:00:00Z",
+    };
+    target.modules = [old];
+    const result = importTimetableSnapshot(target, buildTimetableSnapshot(data));
+    const matches = result.data.modules.filter((module) => module.code === old.code);
+    expect(matches).toHaveLength(2);
+    expect(matches.find((module) => !module.archived_at)?.academic_year).toBe(target.student.academic_year);
+    expect(result.data.modules.find((module) => module.id === old.id)).toEqual(old);
+  });
   it("rejects another cohort or timezone", () => {
     const payload = buildTimetableSnapshot(source());
     for (const field of [

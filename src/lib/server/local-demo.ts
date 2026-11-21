@@ -103,6 +103,9 @@ export async function mutateLocalDemo(
       return item;
     };
     if (action === "module_save") {
+      const moduleYear = id
+        ? module().academic_year ?? data.student.academic_year
+        : data.student.academic_year;
       const values = {
         name: String(input.name),
         code: String(input.code),
@@ -118,11 +121,12 @@ export async function mutateLocalDemo(
           (m) =>
             m.id !== id &&
             m.code === values.code &&
-            m.semester === values.semester,
+            m.semester === values.semester &&
+            (m.academic_year ?? data.student.academic_year) === moduleYear,
         )
       )
         throw new ApiError(
-          "This module code already exists in this semester.",
+          "This module code already exists in this academic year and semester.",
           409,
         );
       if (id) {
@@ -134,6 +138,7 @@ export async function mutateLocalDemo(
           ...values,
           id: newId,
           archived_at: null,
+          academic_year: data.student.academic_year,
           created_at: stamp,
         });
         result = { id: newId };
@@ -313,6 +318,15 @@ export async function mutateLocalDemo(
     } else if (action === "profile_save") {
       if (!isValidTimezone(String(input.timezone)))
         throw new ApiError("Choose a valid timezone.");
+      if (
+        input.semester !== data.student.semester ||
+        input.academic_year !== data.student.academic_year
+      ) {
+        for (const item of data.modules) {
+          item.academic_year ??= data.student.academic_year;
+          item.archived_at ??= stamp;
+        }
+      }
       const {
         action: unused,
         id: ignored,

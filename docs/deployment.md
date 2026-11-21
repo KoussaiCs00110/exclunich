@@ -5,7 +5,7 @@ The same Next.js application works on either host. Supabase stores the data; the
 ## Supabase
 
 1. Create a Supabase project and open its SQL editor.
-2. For a new database, run both files in `supabase/migrations` in numbered order as project owner. For an existing database, run only `202611200002_timetable_sharing.sql`. Do not rerun the foundation migration on a populated project. This adds the `exclunich_sharing` server RPC and its RLS-protected tables.
+2. For a new database, run all files in `supabase/migrations` in numbered order as project owner. For an existing database, run only pending migrations. An installation that already has timetable sharing needs `202611210001_term_archiving.sql`. Do not rerun the foundation or sharing migration on a populated project. The new migration preserves existing records, adds module academic years, and atomically archives the current timetable when either term field changes.
 3. Obtain the project URL and server secret key from the project's API settings. The `sb_secret_…` key is preferred; the legacy service-role JWT is also supported under `SUPABASE_SERVICE_ROLE_KEY`.
 4. Save a stable `TOKEN_PEPPER` generated with `openssl rand -hex 32`. Keep a secure backup; rotating this secret invalidates access tokens and recovery codes.
 
@@ -35,7 +35,7 @@ Enable managed database backups. Restrict host management access. Keep all datab
 
 ## Current verification boundary
 
-The production build, TypeScript check, 91 unit tests, offline and server-backed PostgreSQL suites, and eight desktop/mobile Chromium browser checks pass locally. Browser checks used the production standalone app and a restricted database runtime role. Login, populated dashboard, history and timetable screenshots were also inspected. See [the verification record](verification.md) for scope and repeatable commands. The source includes both platform configurations. Registration, login, module persistence and deletion of a disposable account also passed against the hosted deployment after the Supabase URL correction. Complete the remaining target HTTPS and manual checks before student use.
+The production build, TypeScript check, 97 unit tests, offline and server-backed PostgreSQL suites, and twelve desktop/mobile Chromium browser checks pass locally. Browser checks used the production standalone app and a restricted database runtime role. Login, populated dashboard, history and timetable screenshots were also inspected. See [the verification record](verification.md) for scope and repeatable commands. Registration, login, module persistence and deletion of a disposable account passed against the hosted deployment after the Supabase URL correction. Automatic term archiving requires applying the new migration to that live database; it has been verified against an isolated populated upgrade database. Complete the remaining target HTTPS and manual checks before student use.
 
 ## Troubleshooting the setup message
 

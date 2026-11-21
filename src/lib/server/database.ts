@@ -17,7 +17,7 @@ function mapDatabaseError(code: string | undefined, message: string): never {
   if (code === "P0002") throw new ApiError(message, 404, "NOT_FOUND");
   if (code === "23505")
     throw new ApiError(
-      "This module code already exists in this semester.",
+      "This module code already exists in this academic year and semester.",
       409,
       "DUPLICATE",
     );

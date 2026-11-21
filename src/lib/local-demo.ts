@@ -65,6 +65,7 @@ export function createLocalDemo(now = new Date()): AppData {
       ],
       description: "Synthetic data for local frontend testing.",
       semester: data.student.semester,
+      academic_year: data.student.academic_year,
       total_threshold: null,
       unjustified_threshold: null,
       archived_at: null,

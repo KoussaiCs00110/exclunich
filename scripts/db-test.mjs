@@ -18,6 +18,9 @@ try {
   await client.query(
     await readFile(new URL("./db-sharing-test.sql", import.meta.url), "utf8"),
   );
+  await client.query(
+    await readFile(new URL("./db-term-test.sql", import.meta.url), "utf8"),
+  );
   console.log(
     "PASS: database authentication, tenant isolation, attendance, recovery, rate limiting and RLS. Fixtures rolled back.",
   );

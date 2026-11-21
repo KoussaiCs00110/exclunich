@@ -22,6 +22,18 @@ const recipient = (): AppData => ({
   audit: [],
 });
 describe("timetable sharing privacy and import integrity", () => {
+  it("excludes blocked classes from new shares and skips them in older snapshots", () => {
+    const data = source();
+    const payload = buildTimetableSnapshot(data);
+    payload.occurrences[0].starts_at = "2026-11-30T08:00:00Z";
+    payload.occurrences[0].ends_at = "2026-11-30T09:00:00Z";
+    const result = importTimetableSnapshot(recipient(), payload);
+    expect(result.data.occurrences).toHaveLength(payload.occurrences.length - 1);
+    const occurrence = data.occurrences[0];
+    occurrence.starts_at = "2026-11-30T08:00:00Z";
+    occurrence.ends_at = "2026-11-30T09:00:00Z";
+    expect(buildTimetableSnapshot(data).occurrences.some((item) => item.id === occurrence.id)).toBe(false);
+  });
   it("allowlists schedule fields and omits private student data", () => {
     const data = source();
     data.student.full_name = "PRIVATE_NAME";

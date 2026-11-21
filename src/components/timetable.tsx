@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { getModuleStats, simulateAbsence } from "@/lib/attendance";
+import { ACADEMIC_PERIODS, isNonTeachingOccurrence } from "@/lib/academic-calendar";
 import type { AppData, Occurrence } from "@/lib/types";
 import { SessionPanel } from "./session-panel";
 import { Modal } from "./modal";
@@ -167,6 +168,7 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
           );
           return (
             module &&
+            !isNonTeachingOccurrence(occurrence, timezone) &&
             !module.archived_at &&
             (moduleFilter === "all" || moduleFilter === occurrence.module_id) &&
             (typeFilter === "all" || typeFilter === occurrence.session_type)
@@ -201,7 +203,7 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
             },
           };
         }),
-    [data, moduleFilter, typeFilter, risks],
+    [data, moduleFilter, typeFilter, risks, timezone],
   );
 
   async function runMutation(
@@ -307,6 +309,20 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
           </button>
         </div>
       </div>
+      <details className="card academic-calendar">
+        <summary>{phrase("Academic calendar · 2026–2027", "Calendrier universitaire · 2026–2027")}</summary>
+        <p className="muted">
+          {phrase("Regular classes are skipped during these periods, including their first and last days. Recurring schedules resume afterward.", "Les séances habituelles sont suspendues pendant ces périodes, premier et dernier jours inclus. Les séances récurrentes reprennent ensuite.")}
+        </p>
+        <ul>
+          {ACADEMIC_PERIODS.map((period) => (
+            <li key={period.code}>
+              <strong>{period[lang]}</strong>
+              <span>{period.start.split("-").reverse().join("/")} – {period.end.split("-").reverse().join("/")}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
       {modules.length === 0 ? (
         <div className="card timetable-empty">
           <CalendarDays size={38} />

@@ -1,5 +1,7 @@
 import "server-only";
 import type { Pool } from "pg";
+import type { AppData } from "../types";
+import { applyAcademicCalendar } from "../academic-calendar";
 
 export class ApiError extends Error {
   constructor(
@@ -67,7 +69,8 @@ export async function rpc<T = unknown>(
           : "select public.absentia_api($1,$2::jsonb,$3) as data",
         [action, JSON.stringify(body), credential],
       );
-      return result.rows[0].data as T;
+      const data = result.rows[0].data;
+      return (action === "snapshot" ? applyAcademicCalendar(data as AppData) : data) as T;
     } catch (error) {
       const e = error as { code?: string; message: string };
       return mapDatabaseError(e.code, e.message);
@@ -113,7 +116,7 @@ export async function rpc<T = unknown>(
         data.code,
         data.message || "Database request failed.",
       );
-    return data as T;
+    return (action === "snapshot" ? applyAcademicCalendar(data as AppData) : data) as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(

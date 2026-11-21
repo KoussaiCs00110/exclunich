@@ -27,7 +27,7 @@ Set these values in `.env.local`:
 - `APP_URL`: `http://localhost:3000` for development; the exact HTTPS origin in production.
 - `SUPABASE_URL` and `SUPABASE_SECRET_KEY`: the project's URL and **server secret** API key. The older JWT service-role key can instead be supplied as `SUPABASE_SERVICE_ROLE_KEY`.
 
-For a new project, apply all SQL files in `supabase/migrations` in numbered order using the Supabase SQL editor as database owner. For an existing installation, apply only pending migrations; do not rerun the foundation or sharing migration. Install [automatic term archiving](supabase/migrations/202611210001_term_archiving.sql) after the sharing migration. This installs the schema, constraints, indexes, RLS and restricted RPCs. There are no public browser credentials to configure.
+For a new project, apply all SQL files in `supabase/migrations` in numbered order using the Supabase SQL editor as database owner. For an existing installation, apply only pending migrations; do not rerun installed migrations. Install [automatic term archiving](supabase/migrations/202611210001_term_archiving.sql) after sharing, followed by [academic-calendar enforcement](supabase/migrations/202611210002_academic_calendar.sql). This installs the schema, constraints, indexes, RLS and restricted RPCs. There are no public browser credentials to configure.
 
 ```bash
 npm run dev
@@ -61,6 +61,21 @@ Browser → Next.js protected pages / JSON route handlers
 The relational model separates weekly session templates from concrete dated occurrences. An attendance record references exactly one occurrence. A composite owner/module foreign key prevents linking another student's records. Cancelled occurrences and cancelled attendance never count. Future occurrences are excluded from actual attendance totals. Unrecorded sessions remain visible and do not invent absences or presence.
 
 The timetable runs from Sunday through Saturday for every account. Older profile settings cannot hide Sunday sessions. Weekly and daily views, the mobile agenda and session details use the same complete schedule.
+
+The shared academic calendar applies to every student's own timetable. For 2026–2027, regular classes are excluded on these inclusive dates:
+
+| Period | First day | Last day |
+| --- | --- | --- |
+| Test 1 | 28 November 2026 | 3 December 2026 |
+| Winter holidays (WH) | 19 December 2026 | 1 January 2027 |
+| January exams | 9 January 2027 | 14 January 2027 |
+| Test 2 | 13 March 2027 | 18 March 2027 |
+| Spring holidays (SH) | 20 March 2027 | 1 April 2027 |
+| May exams | 8 May 2027 | 13 May 2027 |
+
+Dates use the student's configured timezone and apply to this exact year; they are not annual repeating holidays. Recurring schedules keep their selected end date and resume after each excluded period. The app prevents scheduling, moving or restoring regular classes into these dates, excludes existing blocked classes from calendar views, attendance totals and reminders, and skips blocked dates during timetable imports. The timetable's Academic calendar panel lists the periods.
+
+The calendar migration enforces the same rules inside PostgreSQL, removes existing unrecorded classes on excluded dates, and marks recorded classes cancelled while preserving their original attendance and notes. Before that migration is installed, the app applies the calendar on reads and persists cancellations for newly generated blocked classes; existing stored rows are cleaned up when the migration runs.
 
 Changing the saved semester or academic year automatically archives all currently active modules and their timetable in the same database transaction as the profile update. Sessions, occurrences, attendance and notes stay saved and remain available through Archived modules and Attendance History. The active timetable and dashboard start empty; add or import the new term's schedule using the same account. Saving unchanged term fields or editing other settings does not archive anything.
 

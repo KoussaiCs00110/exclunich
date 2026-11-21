@@ -166,7 +166,7 @@ describe("persistent local demo workflows", () => {
     })) as { id: string };
     const after = await localDemoSnapshot();
     const created = after.occurrences.filter((o) => o.session_id === result.id);
-    expect(created).toHaveLength(3);
+    expect(created).toHaveLength(2);
     expect(created[0].starts_at).toBe("2026-11-23T07:00:00.000Z");
   });
   it.each(["semester", "academic_year"] as const)(

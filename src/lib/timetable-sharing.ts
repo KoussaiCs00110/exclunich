@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AppData, Module, Session, Occurrence, Student } from "./types";
+import { isNonTeachingOccurrence } from "./academic-calendar";
 
 export type SharedCohort = Pick<
   Student,
@@ -110,6 +111,7 @@ export function buildTimetableSnapshot(data: AppData): TimetableSnapshot {
     );
   const sessionIds = new Set(sessions.map((s) => s.id));
   const occurrences = data.occurrences
+    .filter((occurrence) => !isNonTeachingOccurrence(occurrence, timezone))
     .filter((o) => sessionIds.has(o.session_id))
     .map(
       ({
@@ -238,6 +240,7 @@ export function importTimetableSnapshot(
     sessionsAdded++;
   }
   for (const source of snapshot.occurrences) {
+    if (isNonTeachingOccurrence(source, target.student.timezone)) continue;
     const session_id = sessionMap.get(source.session_id);
     if (!session_id) continue;
     const module_id = moduleMap.get(source.module_id);

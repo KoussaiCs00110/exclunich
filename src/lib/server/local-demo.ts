@@ -7,6 +7,7 @@ import { createLocalDemo, localDemoAllowed } from "../local-demo";
 import type { AppData, Notification } from "../types";
 import { buildNotifications } from "../notifications";
 import { localDateKey, localDateTimeToISO, isValidTimezone } from "../timezone";
+import { academicPeriodForDate, isNonTeachingOccurrence, applyAcademicCalendar, teachingDates } from "../academic-calendar";
 import { ApiError } from "./database";
 import {
   buildTimetableSnapshot,
@@ -81,7 +82,7 @@ export async function localDemoSnapshot(): Promise<AppData> {
   return locked(async () => {
     const state = await readState();
     await saveState(state);
-    return state.data;
+    return applyAcademicCalendar(state.data);
   });
 }
 export async function mutateLocalDemo(
@@ -153,6 +154,8 @@ export async function mutateLocalDemo(
       data.attendance = data.attendance.filter((a) => a.module_id !== id);
       data.notifications = data.notifications.filter((n) => n.module_id !== id);
     } else if (action === "session_save") {
+      if (!teachingDates(String(input.recurrence_start), String(input.recurrence_end), Number(input.weekday)).length)
+        throw new ApiError("No teaching dates remain in this range because of the academic calendar.");
       const owner = data.modules.find(
         (m) => m.id === input.module_id && !m.archived_at,
       );
@@ -189,6 +192,7 @@ export async function mutateLocalDemo(
       ) {
         if ((new Date(day).getUTCDay() || 7) !== session.weekday) continue;
         const date = new Date(day).toISOString().slice(0, 10);
+        if (academicPeriodForDate(date)) continue;
         if (
           data.occurrences.some(
             (o) => o.session_id === session!.id && o.occurrence_date === date,
@@ -240,6 +244,8 @@ export async function mutateLocalDemo(
         ends = String(input.ends_at || item.ends_at);
       if (Date.parse(ends) <= Date.parse(starts))
         throw new ApiError("End time must be after start time.");
+      if (input.cancelled !== true && isNonTeachingOccurrence({ starts_at: starts, ends_at: ends }, data.student.timezone))
+        throw new ApiError("Regular classes cannot be scheduled during tests, holidays or exams.");
       Object.assign(
         item,
         { starts_at: starts, ends_at: ends },
@@ -265,6 +271,8 @@ export async function mutateLocalDemo(
         (o) => o.id === input.occurrence_id,
       );
       if (!occurrence) throw missing();
+      if (input.attendance_status !== "cancelled" && isNonTeachingOccurrence(occurrence, data.student.timezone))
+        throw new ApiError("Attendance cannot be recorded during tests, holidays or exams.");
       if (Date.parse(occurrence.ends_at) > Date.now())
         throw new ApiError(
           "Attendance can only be recorded after the session ends.",

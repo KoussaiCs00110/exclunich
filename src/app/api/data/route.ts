@@ -10,6 +10,7 @@ import { secretHash } from "@/lib/server/credentials";
 import { ApiError, rpc } from "@/lib/server/database";
 import { failure, readBody, success } from "@/lib/server/http";
 import { dataSchema } from "@/lib/server/validation";
+import { academicPeriodForInterval, isNonTeachingOccurrence, teachingDates } from "@/lib/academic-calendar";
 import {
   localDemoEnabled,
   localDemoSnapshot,
@@ -55,14 +56,16 @@ export async function POST(request: NextRequest) {
     const input = dataSchema.parse(await readBody(request));
     if (await localDemoEnabled()) return success(await mutateLocalDemo(input));
     const credential = await credentialFromCookie();
+    const before = ["profile_save", "session_save", "occurrence_save", "attendance_save"].includes(input.action)
+      ? await rpc<AppData>("snapshot", {}, credential)
+      : null;
     if (input.action === "profile_save") {
-      const before = await rpc<AppData>("snapshot", {}, credential);
       const changingTerm =
-        before.student.semester !== input.semester ||
-        before.student.academic_year !== input.academic_year;
+        before!.student.semester !== input.semester ||
+        before!.student.academic_year !== input.academic_year;
       if (
         changingTerm &&
-        before.modules.some(
+        before!.modules.some(
           (module) => !module.archived_at && !module.academic_year,
         )
       )
@@ -71,6 +74,18 @@ export async function POST(request: NextRequest) {
           503,
           "MIGRATION_REQUIRED",
         );
+    }
+    if (input.action === "session_save" && !teachingDates(input.recurrence_start, input.recurrence_end, input.weekday).length)
+      throw new ApiError("No teaching dates remain in this range because of the academic calendar.");
+    if (input.action === "occurrence_save" && input.cancelled !== true) {
+      const occurrence = before!.occurrences.find((item) => item.id === input.id);
+      if (occurrence && academicPeriodForInterval(input.starts_at ?? occurrence.starts_at, input.ends_at ?? occurrence.ends_at, before!.student.timezone))
+        throw new ApiError("Regular classes cannot be scheduled during tests, holidays or exams.");
+    }
+    if (input.action === "attendance_save" && input.attendance_status !== "cancelled") {
+      const occurrence = before!.occurrences.find((item) => item.id === input.occurrence_id);
+      if (occurrence && isNonTeachingOccurrence(occurrence, before!.student.timezone))
+        throw new ApiError("Attendance cannot be recorded during tests, holidays or exams.");
     }
     const shouldNotify = [
       "attendance_save",
@@ -85,6 +100,16 @@ export async function POST(request: NextRequest) {
       delete body.currentToken;
     }
     const result = await rpc(input.action, body, credential);
+    if (input.action === "session_save") {
+      // Also support deployed databases before the calendar trigger is installed.
+      const after = await rpc<AppData>("snapshot", {}, credential);
+      const sessionId = (result as { id: string }).id;
+      const recorded = new Set(after.attendance.map((item) => item.occurrence_id));
+      for (const occurrence of after.occurrences) {
+        if (occurrence.session_id === sessionId && !recorded.has(occurrence.id) && isNonTeachingOccurrence(occurrence, after.student.timezone))
+          await rpc("occurrence_save", { id: occurrence.id, cancelled: true }, credential);
+      }
+    }
     if (input.action === "account_delete") {
       (await cookies()).delete(SESSION_COOKIE);
       return success(result);

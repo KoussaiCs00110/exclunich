@@ -1,4 +1,5 @@
-import { formatInZone } from "./timezone";
+import { DEFAULT_TIMEZONE, formatInZone } from "./timezone";
+import { isNonTeachingOccurrence } from "./academic-calendar";
 import { t } from "./i18n";
 import type {
   AbsenceSimulation,
@@ -106,7 +107,7 @@ function latestAttendance(
  * wins defensively; the database additionally enforces occurrence uniqueness.
  */
 export function getCountedRecords(
-  data: Pick<AppData, "occurrences" | "attendance">,
+  data: Pick<AppData, "occurrences" | "attendance"> & Partial<Pick<AppData, "student">>,
   now: Date | number = Date.now(),
 ): Attendance[] {
   const occurrences = new Map(
@@ -116,6 +117,7 @@ export function getCountedRecords(
     const occurrence = occurrences.get(record.occurrence_id)!;
     return (
       !occurrence.cancelled &&
+      !isNonTeachingOccurrence(occurrence, data.student?.timezone ?? DEFAULT_TIMEZONE) &&
       hasSessionEnded(occurrence, now) &&
       record.attendance_status !== "cancelled"
     );
@@ -133,6 +135,7 @@ export function getModuleStats(
     (occurrence) =>
       occurrence.module_id === module.id &&
       !occurrence.cancelled &&
+      !isNonTeachingOccurrence(occurrence, data.student.timezone) &&
       latest.get(occurrence.id)?.attendance_status !== "cancelled",
   );
   const records = getCountedRecords(data, now).filter(
@@ -291,6 +294,7 @@ export function getUpcomingSessions(
       (occurrence) =>
         activeModuleIds.has(occurrence.module_id) &&
         !occurrence.cancelled &&
+        !isNonTeachingOccurrence(occurrence, data.student.timezone) &&
         latest.get(occurrence.id)?.attendance_status !== "cancelled" &&
         Date.parse(occurrence.starts_at) > timestamp(now),
     )

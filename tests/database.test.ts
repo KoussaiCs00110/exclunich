@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 import { rpc } from "../src/lib/server/database";
+import { createLocalDemo } from "../src/lib/local-demo";
 
 beforeEach(() => {
   vi.stubEnv("DATABASE_URL", "");
@@ -14,6 +15,18 @@ afterEach(() => {
 });
 
 describe("Supabase HTTP adapter", () => {
+  it("excludes existing blocked classes even before database cleanup", async () => {
+    vi.stubEnv("SUPABASE_URL", "https://project.supabase.co");
+    const snapshot = createLocalDemo();
+    snapshot.occurrences[0].starts_at = "2026-11-30T08:00:00Z";
+    snapshot.occurrences[0].ends_at = "2026-11-30T09:00:00Z";
+    snapshot.occurrences[0].cancelled = false;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(snapshot)));
+    const data = await rpc<typeof snapshot>("snapshot", {}, "session-hash");
+    expect(data.occurrences[0].cancelled).toBe(true);
+    expect(data.attendance).toEqual(snapshot.attendance);
+    expect(snapshot.occurrences[0].cancelled).toBe(false);
+  });
   it.each([
     "https://project.supabase.co",
     "https://project.supabase.co/",
@@ -67,7 +80,7 @@ describe("Supabase HTTP adapter", () => {
     vi.stubEnv("SUPABASE_URL", "https://project.supabase.co");
     vi.stubEnv("SUPABASE_SECRET_KEY", "");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", " legacy-test-key\n");
-    const fetch = vi.fn().mockResolvedValue(Response.json([]));
+    const fetch = vi.fn().mockResolvedValue(Response.json(createLocalDemo()));
     vi.stubGlobal("fetch", fetch);
 
     await rpc("snapshot", {}, "session-hash");

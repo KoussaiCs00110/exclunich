@@ -1,0 +1,10 @@
+node_modules
+.next
+.env*
+!.env.example
+.local
+.postgres
+.git
+.openai
+test-results
+playwright-report

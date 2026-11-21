@@ -1,0 +1,13 @@
+node_modules/
+node_modules
+.next/
+.env*
+!.env.example
+.postgres/
+.local/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.open-next/
+dist/
+*.tar.gz

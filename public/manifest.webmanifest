@@ -1,0 +1,24 @@
+{
+  "name": "Exclunich \u2014 Student attendance",
+  "short_name": "Exclunich",
+  "description": "Stay present. Stay ahead.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#191f1c",
+  "theme_color": "#191f1c",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

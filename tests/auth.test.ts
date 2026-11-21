@@ -1,0 +1,206 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  deriveRecoveryReplacement,
+  generateAccessToken,
+  generateRecoveryCode,
+  generateSession,
+  secretHash,
+  sessionHash,
+} from "../src/lib/server/credentials";
+import { authSchema, dataSchema } from "../src/lib/server/validation";
+
+const originalPepper = process.env.TOKEN_PEPPER;
+beforeAll(() => {
+  process.env.TOKEN_PEPPER = "test-only-pepper-32-characters-long-do-not-use";
+});
+afterAll(() => {
+  if (originalPepper === undefined) delete process.env.TOKEN_PEPPER;
+  else process.env.TOKEN_PEPPER = originalPepper;
+});
+
+describe("passwordless credentials", () => {
+  it("generates unique readable cryptographic access and recovery credentials", () => {
+    const tokens = Array.from({ length: 500 }, generateAccessToken);
+    expect(new Set(tokens).size).toBe(tokens.length);
+    for (const token of tokens)
+      expect(token).toMatch(/^ABS(?:-[2-9A-HJ-NP-Z]{4}){8}$/);
+    expect(generateRecoveryCode()).toMatch(/^REC(?:-[2-9A-HJ-NP-Z]{4}){8}$/);
+  });
+  it("normalizes case, separators and pasted whitespace without storing plaintext", () => {
+    const token = generateAccessToken();
+    const hash = secretHash(token, "access");
+    expect(hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(hash).not.toContain("ABS");
+    expect(
+      secretHash(`  ${token.toLowerCase().replaceAll("-", " ")}\n`, "access"),
+    ).toBe(hash);
+  });
+  it("separates recovery/access and rate-limiting hash domains", () => {
+    expect(secretHash("same-value", "access")).not.toBe(
+      secretHash("same-value", "recovery"),
+    );
+    expect(secretHash("same-value", "rate")).not.toBe(
+      secretHash("same-value", "access"),
+    );
+  });
+  it("depends on the server pepper and refuses an absent or weak pepper", () => {
+    const first = secretHash("token", "access");
+    process.env.TOKEN_PEPPER =
+      "another-test-only-pepper-at-least-32-characters";
+    expect(secretHash("token", "access")).not.toBe(first);
+    process.env.TOKEN_PEPPER = "short";
+    expect(() => secretHash("token", "access")).toThrow("TOKEN_PEPPER");
+    delete process.env.TOKEN_PEPPER;
+    expect(() => secretHash("token", "access")).toThrow("TOKEN_PEPPER");
+    process.env.TOKEN_PEPPER = "test-only-pepper-32-characters-long-do-not-use";
+  });
+  it("re-derives the exact pending recovery replacement after a dropped response", () => {
+    const code = generateRecoveryCode();
+    const first = deriveRecoveryReplacement(code);
+    expect(
+      deriveRecoveryReplacement(code.toLowerCase().replaceAll("-", " ")),
+    ).toEqual(first);
+    expect(first.token).toMatch(/^ABS(?:-[2-9A-HJ-NP-Z]{4}){8}$/);
+    expect(first.recoveryCode).toMatch(/^REC(?:-[2-9A-HJ-NP-Z]{4}){8}$/);
+    expect(first.recoveryCode).not.toBe(code);
+    expect(deriveRecoveryReplacement(generateRecoveryCode())).not.toEqual(
+      first,
+    );
+  });
+  it("creates independent 256-bit opaque sessions and stores their hashes", () => {
+    const a = generateSession(),
+      b = generateSession();
+    expect(a).toMatch(/^[\w-]{43}$/);
+    expect(a).not.toBe(b);
+    expect(sessionHash(a)).toMatch(/^[a-f0-9]{64}$/);
+    expect(sessionHash(a)).not.toBe(sessionHash(b));
+    expect(sessionHash(a)).toBe(sessionHash(a));
+  });
+});
+
+const profile = {
+  full_name: "Amine Student",
+  academic_year: "2026/2027",
+  department: "Computer Science",
+  group_name: "G1",
+  semester: "S3",
+};
+const uuid = "a15ab004-3d36-4628-b2f5-08e76bbcae8a";
+const session = {
+  action: "session_save",
+  module_id: uuid,
+  session_type: "TD",
+  weekday: 1,
+  start_time: "08:00",
+  end_time: "09:00",
+  recurrence_start: "2026-11-23",
+  recurrence_end: "2027-01-04",
+};
+describe("server input validation", () => {
+  it("requires a complete student profile and an explicit saved-secret acknowledgement", () => {
+    expect(
+      authSchema.safeParse({ action: "register", ...profile }).success,
+    ).toBe(true);
+    expect(
+      authSchema.parse({ action: "register", ...profile, language: "fr" }),
+    ).toHaveProperty("language", "fr");
+    expect(
+      authSchema.safeParse({
+        action: "register",
+        ...profile,
+        language: "unknown",
+      }).success,
+    ).toBe(false);
+    expect(
+      authSchema.safeParse({ action: "register", ...profile, full_name: "A" })
+        .success,
+    ).toBe(false);
+    expect(
+      authSchema.safeParse({ action: "confirm", saved: false }).success,
+    ).toBe(false);
+    expect(
+      authSchema.safeParse({ action: "confirm", saved: true }).success,
+    ).toBe(true);
+  });
+  it("never accepts a client-supplied student identity", () => {
+    const parsed = dataSchema.parse({
+      action: "attendance_save",
+      occurrence_id: uuid,
+      attendance_status: "present",
+      student_id: uuid,
+    });
+    expect(parsed).not.toHaveProperty("student_id");
+  });
+  it("rejects malformed IDs, unrecognized statuses, out-of-range thresholds and unsafe colors", () => {
+    expect(
+      dataSchema.safeParse({
+        action: "attendance_save",
+        occurrence_id: "invalid",
+        attendance_status: "present",
+      }).success,
+    ).toBe(false);
+    expect(
+      dataSchema.safeParse({
+        action: "attendance_save",
+        occurrence_id: uuid,
+        attendance_status: "missing",
+      }).success,
+    ).toBe(false);
+    const module = {
+      action: "module_save",
+      name: "Networks",
+      code: "NET",
+      color: "#3b82f6",
+      semester: "S3",
+    };
+    expect(dataSchema.safeParse(module).success).toBe(true);
+    expect(
+      dataSchema.safeParse({ ...module, total_threshold: 0 }).success,
+    ).toBe(false);
+    expect(
+      dataSchema.safeParse({ ...module, color: "url(javascript:alert(1))" })
+        .success,
+    ).toBe(false);
+  });
+  it("validates recurrence range, real calendar dates, weekday and ordered session times", () => {
+    expect(dataSchema.safeParse(session).success).toBe(true);
+    expect(
+      dataSchema.safeParse({ ...session, end_time: "07:00" }).success,
+    ).toBe(false);
+    expect(
+      dataSchema.safeParse({ ...session, recurrence_start: "2026-02-31" })
+        .success,
+    ).toBe(false);
+    expect(
+      dataSchema.safeParse({ ...session, recurrence_end: "2030-01-01" })
+        .success,
+    ).toBe(false);
+    expect(
+      dataSchema.safeParse({
+        ...session,
+        recurrence_end: "2026-11-23",
+        weekday: 2,
+      }).success,
+    ).toBe(false);
+  });
+  it("requires a current credential and exact confirmation before deleting an account", () => {
+    expect(
+      dataSchema.safeParse({
+        action: "account_delete",
+        currentToken: "ABS-TEST",
+        confirmation: "DELETE",
+      }).success,
+    ).toBe(true);
+    expect(
+      dataSchema.safeParse({ action: "account_delete", confirmation: "DELETE" })
+        .success,
+    ).toBe(false);
+    expect(
+      dataSchema.safeParse({
+        action: "account_delete",
+        currentToken: "ABS-TEST",
+        confirmation: "delete",
+      }).success,
+    ).toBe(false);
+  });
+});

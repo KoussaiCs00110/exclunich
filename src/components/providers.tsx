@@ -1,0 +1,15 @@
+"use client";
+import { useEffect } from "react";
+import { Toaster } from "sonner";
+export function Providers({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    if ("serviceWorker" in navigator && process.env.NODE_ENV === "production")
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }, []);
+  return (
+    <>
+      {children}
+      <Toaster richColors position="top-right" closeButton theme="system" />
+    </>
+  );
+}

@@ -35,7 +35,7 @@ Enable managed database backups. Restrict host management access. Keep all datab
 
 ## Current verification boundary
 
-The production build, TypeScript check, 91 unit tests, offline and server-backed PostgreSQL suites, and six desktop/mobile Chromium browser checks pass locally. Browser checks used the production standalone app and a restricted database runtime role. Login, populated dashboard, history and timetable screenshots were also inspected. See [the verification record](verification.md) for scope and repeatable commands. The source includes both platform configurations; successful registration and persistence against the hosted deployment's Supabase configuration still need verification. Complete the target HTTPS and manual checks before student use.
+The production build, TypeScript check, 91 unit tests, offline and server-backed PostgreSQL suites, and eight desktop/mobile Chromium browser checks pass locally. Browser checks used the production standalone app and a restricted database runtime role. Login, populated dashboard, history and timetable screenshots were also inspected. See [the verification record](verification.md) for scope and repeatable commands. The source includes both platform configurations. Registration, login, module persistence and deletion of a disposable account also passed against the hosted deployment after the Supabase URL correction. Complete the remaining target HTTPS and manual checks before student use.
 
 ## Troubleshooting the setup message
 

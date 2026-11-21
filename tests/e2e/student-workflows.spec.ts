@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { zonedWeekDates } from "../../src/lib/timezone";
 const profile = {
   full_name: "Attendance Test Student",
   student_identifier: "",
@@ -7,6 +8,84 @@ const profile = {
   group_name: "Test",
   semester: "Semester 1",
 };
+
+test("Sunday sessions are visible even with the legacy Sunday preference disabled", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  const account = await api(page, "/api/auth", {
+    action: "register",
+    ...profile,
+  });
+  try {
+    await api(page, "/api/auth", { action: "confirm", saved: true });
+    const snapshot = await api(page, "/api/data");
+    await api(page, "/api/data", {
+      action: "profile_save",
+      ...snapshot.student,
+      student_identifier: snapshot.student.student_identifier ?? "",
+      show_sunday: false,
+    });
+    const module = await api(page, "/api/data", {
+      action: "module_save",
+      name: "Sunday Networks",
+      code: "SUN-TEST",
+      professor: "",
+      description: "",
+      color: "#628b75",
+      semester: profile.semester,
+      total_threshold: null,
+      unjustified_threshold: null,
+    });
+    const sunday = zonedWeekDates(new Date(), snapshot.student.timezone)[6];
+    await api(page, "/api/data", {
+      action: "session_save",
+      module_id: module.id,
+      session_type: "TD",
+      weekday: 7,
+      start_time: "09:00",
+      end_time: "10:00",
+      classroom: "Sunday Room",
+      professor: "",
+      recurrence_start: sunday,
+      recurrence_end: sunday,
+    });
+
+    for (let visit = 0; visit < 2; visit++) {
+      await page.goto("/timetable");
+      if (page.viewportSize()!.width <= 720) {
+        await page.locator(".fc-listWeek-button").click();
+        await expect(
+          page.locator(`.fc-list-day[data-date="${sunday}"]`),
+        ).toBeVisible();
+      } else {
+        await expect(page.locator(".fc-col-header-cell")).toHaveCount(7);
+        await expect(
+          page.locator(`.fc-col-header-cell[data-date="${sunday}"]`),
+        ).toBeVisible();
+      }
+      await expect(
+        page.locator(".calendar-event-content strong", {
+          hasText: "Sunday Networks",
+        }),
+      ).toBeVisible();
+      await page.locator(".fc-event", { hasText: "Sunday Networks" }).click();
+      await expect(page.locator(".session-panel")).toContainText("Sunday Room");
+      await page.keyboard.press("Escape");
+    }
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "Preferences", exact: true }).click();
+    await expect(
+      page.getByRole("checkbox", { name: /Show Sunday/ }),
+    ).toHaveCount(0);
+  } finally {
+    await api(page, "/api/data", {
+      action: "account_delete",
+      currentToken: account.token,
+      confirmation: "DELETE",
+    });
+  }
+});
 async function api(page: Page, path: string, body?: Record<string, unknown>) {
   const origin = new URL(page.url()).origin;
   const response = await page.request.fetch(path, {

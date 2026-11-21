@@ -386,7 +386,7 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
                 initialView="timeGridWeek"
                 timeZone={timezone}
                 firstDay={1}
-                hiddenDays={data.student.show_sunday ? [] : [0]}
+                hiddenDays={[]}
                 allDaySlot={false}
                 slotMinTime="07:00:00"
                 slotMaxTime="21:00:00"

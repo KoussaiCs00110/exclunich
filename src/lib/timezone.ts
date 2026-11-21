@@ -145,12 +145,11 @@ export function localDateTimeToISO(
 export function zonedWeekDates(
   anchor: DateValue = new Date(),
   timezone = DEFAULT_TIMEZONE,
-  showSunday = false,
 ): string[] {
   const key = localDateKey(anchor, timezone);
   const monday = new Date(`${key}T12:00:00Z`);
   monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
-  return Array.from({ length: showSunday ? 7 : 6 }, (_, index) => {
+  return Array.from({ length: 7 }, (_, index) => {
     const day = new Date(monday);
     day.setUTCDate(day.getUTCDate() + index);
     return day.toISOString().slice(0, 10);

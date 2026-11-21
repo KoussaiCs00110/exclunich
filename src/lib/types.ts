@@ -11,6 +11,7 @@ export interface Settings {
   theme: Theme;
   total_threshold: number;
   unjustified_threshold: number;
+  /** Retained for profile API compatibility; calendars always show all seven days. */
   show_sunday: boolean;
   notifications_enabled: boolean;
 }

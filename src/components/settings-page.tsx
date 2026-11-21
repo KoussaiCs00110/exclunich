@@ -418,15 +418,6 @@ export function SettingsPage() {
                     </small>
                   </div>
                   <label className="checkbox-row span-2">
-                    <input type="checkbox" {...register("show_sunday")} />
-                    <span>
-                      {phrase(
-                        "Show Sunday in my weekly timetable",
-                        "Afficher le dimanche dans mon emploi du temps",
-                      )}
-                    </span>
-                  </label>
-                  <label className="checkbox-row span-2">
                     <input
                       type="checkbox"
                       {...register("notifications_enabled")}

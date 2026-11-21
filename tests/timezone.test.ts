@@ -31,7 +31,7 @@ describe("Africa/Algiers and IANA timezone handling", () => {
       "Fri, 20 Nov · 08:30",
     );
   });
-  it("starts the timetable on Monday and includes Sunday only when configured", () => {
+  it("includes all seven days through Sunday in the local week", () => {
     expect(zonedWeekDates("2026-11-22T12:00:00Z")).toEqual([
       "2026-11-16",
       "2026-11-17",
@@ -39,10 +39,8 @@ describe("Africa/Algiers and IANA timezone handling", () => {
       "2026-11-19",
       "2026-11-20",
       "2026-11-21",
+      "2026-11-22",
     ]);
-    expect(
-      zonedWeekDates("2026-11-22T12:00:00Z", "Africa/Algiers", true),
-    ).toHaveLength(7);
   });
   it("chooses the next week when the local Monday starts before UTC Monday", () => {
     expect(zonedWeekDates("2026-11-22T23:30:00Z")[0]).toBe("2026-11-23");

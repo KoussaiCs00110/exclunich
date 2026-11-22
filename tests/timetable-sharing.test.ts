@@ -3,7 +3,6 @@ import { createLocalDemo } from "../src/lib/local-demo";
 import {
   buildTimetableSnapshot,
   importTimetableSnapshot,
-  sameCohort,
 } from "../src/lib/timetable-sharing";
 import {
   generateTimetableToken,
@@ -171,30 +170,29 @@ describe("timetable sharing privacy and import integrity", () => {
     expect(matches.find((module) => !module.archived_at)?.academic_year).toBe(target.student.academic_year);
     expect(result.data.modules.find((module) => module.id === old.id)).toEqual(old);
   });
-  it("rejects another cohort or timezone", () => {
+  it("accepts every profile mismatch and maps modules into the recipient's current term", () => {
     const payload = buildTimetableSnapshot(source());
     for (const field of [
       "group_name",
       "department",
       "academic_year",
       "semester",
-      "timezone",
     ] as const) {
       const target = recipient();
       target.student[field] = "Other";
-      expect(() => importTimetableSnapshot(target, payload)).toThrow();
-      expect(target.modules).toHaveLength(0);
+      const before = structuredClone(target);
+      const imported = importTimetableSnapshot(target, payload);
+      expect(imported.data.student).toEqual(before.student);
+      expect(imported.data.modules.every((module) => module.semester === target.student.semester && module.academic_year === target.student.academic_year)).toBe(true);
+      expect(imported.data.occurrences.map((item) => item.starts_at)).toEqual(payload.occurrences.map((item) => item.starts_at));
+      expect(target).toEqual(before);
     }
   });
-  it("normalizes declared cohort capitalization and spaces", () => {
-    const data = source();
-    expect(
-      sameCohort(data.student, {
-        ...data.student,
-        group_name: " group   03 ",
-        department: "computer science",
-      }),
-    ).toBe(true);
+  it("retains timezone validation to preserve weekly class hours", () => {
+    const target = recipient();
+    target.student.timezone = "UTC";
+    expect(() => importTimetableSnapshot(target, buildTimetableSnapshot(source()))).toThrow("timezone");
+    expect(target.modules).toHaveLength(0);
   });
   it("requires scheduled sessions", () => {
     const data = source();

@@ -25,6 +25,7 @@ import { Logo } from "./logo";
 import { copyText, downloadFile, requestApi } from "@/lib/client";
 import { semesterLabel, t } from "@/lib/i18n";
 import type { Language } from "@/lib/types";
+import { DEPARTMENTS, GROUPS } from "@/lib/academic-profile";
 
 const registrationSchema = (language: Language) =>
   z.object({
@@ -42,12 +43,12 @@ const registrationSchema = (language: Language) =>
       .string()
       .trim()
       .min(1, t(language, "auth.departmentError"))
-      .max(100, t(language, "auth.tooLong", { count: 100 })),
+      .refine((value) => DEPARTMENTS.some((department) => department === value), t(language, "auth.departmentError")),
     group_name: z
       .string()
       .trim()
       .min(1, t(language, "auth.groupError"))
-      .max(40, t(language, "auth.tooLong", { count: 40 })),
+      .refine((value) => GROUPS.some((group) => group === value), t(language, "auth.groupError")),
     semester: z.string().min(1, t(language, "auth.required")),
   });
 type Registration = z.infer<ReturnType<typeof registrationSchema>>;
@@ -168,7 +169,7 @@ export default function AuthPage({
       full_name: "",
       student_identifier: "",
       academic_year: academicYear,
-      department: "Computer Science",
+      department: "",
       group_name: "",
       semester: "Semester 1",
     },
@@ -569,11 +570,14 @@ export default function AuthPage({
                   <label htmlFor="department">
                     {t(language, "department")}
                   </label>
-                  <input
+                  <select
                     id="department"
                     className="input"
                     {...register("department")}
-                  />
+                  >
+                    <option value="" disabled>{t(language, "auth.departmentPlaceholder")}</option>
+                    {DEPARTMENTS.map((department) => <option key={department} value={department}>{department}</option>)}
+                  </select>
                   {errors.department && (
                     <span className="field-error">
                       {errors.department.message}
@@ -582,12 +586,14 @@ export default function AuthPage({
                 </div>
                 <div className="field">
                   <label htmlFor="group_name">{t(language, "group")}</label>
-                  <input
+                  <select
                     id="group_name"
                     className="input"
-                    placeholder={t(language, "auth.groupPlaceholder")}
                     {...register("group_name")}
-                  />
+                  >
+                    <option value="" disabled>{t(language, "auth.groupPlaceholder")}</option>
+                    {GROUPS.map((group) => <option key={group} value={group}>{group}</option>)}
+                  </select>
                   {errors.group_name && (
                     <span className="field-error">
                       {errors.group_name.message}

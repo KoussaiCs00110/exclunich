@@ -20,8 +20,8 @@ for (const field of ["semester", "academic_year"] as const) {
       action: "register",
       full_name: "Term Change Student",
       academic_year: "2026–2027",
-      department: "Computer Science",
-      group_name: "Term Test",
+      department: "Formation de base",
+      group_name: "A2",
       semester: "Semester 1",
     });
     try {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeDepartment, normalizeGroup } from "../academic-profile";
 const text = (max = 120) => z.string().trim().max(max);
 const required = (max = 120) => text(max).min(1);
 const uuid = z.string().uuid();
@@ -8,8 +9,8 @@ const profile = {
   full_name: required(100).min(2),
   student_identifier: text(60).optional().default(""),
   academic_year: required(30),
-  department: required(100),
-  group_name: required(40),
+  department: required(100).transform(normalizeDepartment).refine(Boolean, "Choose Formation de base or Formation supérieure."),
+  group_name: required(40).transform(normalizeGroup).refine(Boolean, "Choose a group from A1–A6 or B1–B6."),
   semester: required(30),
 };
 export const authSchema = z.discriminatedUnion("action", [

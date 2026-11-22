@@ -12,7 +12,7 @@ test("academic breaks apply to different students without sharing their classes"
     await page.goto("/login");
     const registration = await request(page, {
       action: "register", full_name: `Calendar Student ${number}`,
-      academic_year: "2026–2027", department: "CS", group_name: `Separate group ${number}`, semester: "Semester 3",
+      academic_year: "2026–2027", department: "Formation de base", group_name: `A${number}`, semester: "Semester 3",
     }, "/api/auth");
     expect(registration.ok()).toBeTruthy();
     const account = (await registration.json()).data;
@@ -30,7 +30,7 @@ test("academic breaks apply to different students without sharing their classes"
       const snapshot = (await (await page.request.get("/api/data")).json()).data;
       expect(snapshot.modules).toHaveLength(1);
       expect(snapshot.modules[0].name).toBe(`Personal Module ${number}`);
-      expect(snapshot.student.group_name).toBe(`Separate group ${number}`);
+      expect(snapshot.student.group_name).toBe(`A${number}`);
       expect(snapshot.occurrences.filter((item: { cancelled: boolean }) => !item.cancelled)).toHaveLength(6);
       const first = snapshot.occurrences.find((item: { starts_at: string }) => item.starts_at.startsWith("2026-11-22"));
       expect(first).toBeTruthy();

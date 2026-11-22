@@ -9,7 +9,7 @@ async function api(page: Page, path: string, body?: Record<string, unknown>) {
 
 test("a student joining mid-semester saves, corrects and resets earlier absences", async ({ page }) => {
   await page.goto("/login");
-  const account = await api(page, "/api/auth", { action: "register", full_name: "Mid-semester Student", academic_year: "2026–2027", department: "CS", group_name: "Balance", semester: "Semester 3" });
+  const account = await api(page, "/api/auth", { action: "register", full_name: "Mid-semester Student", academic_year: "2026–2027", department: "Formation de base", group_name: "A3", semester: "Semester 3" });
   try {
     await api(page, "/api/auth", { action: "confirm", saved: true });
     await page.goto("/modules?add=1");

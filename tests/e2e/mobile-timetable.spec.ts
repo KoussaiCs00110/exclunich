@@ -18,7 +18,7 @@ async function expectReachable(control: Locator) {
 
 test("long agenda titles and session actions fit phone screens and smaller viewports", async ({ page, isMobile }) => {
   await page.goto("/login");
-  const account = await api(page, "/api/auth", { action: "register", full_name: "Phone Timetable Student", academic_year: "2026–2027", department: "CS", group_name: "Phone", semester: "Semester 3" });
+  const account = await api(page, "/api/auth", { action: "register", full_name: "Phone Timetable Student", academic_year: "2026–2027", department: "Formation de base", group_name: "B3", semester: "Semester 3" });
   const name = "Introduction to Databases and Information Systems with Practical Applications";
   try {
     await api(page, "/api/auth", { action: "confirm", saved: true });

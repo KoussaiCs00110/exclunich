@@ -27,7 +27,7 @@ if ! rg -q 'PASS: academic calendar' "$cluster_dir/calendar.log"; then cat "$clu
 if rg -q 'ERROR|FATAL' "$cluster_dir/initial-absences.log"; then cat "$cluster_dir/initial-absences.log"; exit 1; fi
 if ! rg -q 'PASS: initial absence balances' "$cluster_dir/initial-absences.log"; then cat "$cluster_dir/initial-absences.log"; exit 1; fi
 printf 'PASS: real PostgreSQL migration, authentication, recovery, isolation, attendance, rate limits, RLS configuration and deletion (effective-role RLS requires a server).\n'
-printf 'PASS: timetable sharing, privacy, cohort restrictions, duplication, expiry and revocation.\n'
+printf 'PASS: timetable sharing, privacy, profile-independent access, duplication, expiry and revocation.\n'
 printf 'PASS: automatic term archiving, transaction rollback, preserved history and academic-year isolation.\n'
 printf 'PASS: academic calendar exclusions, inclusive dates, recurrence, historical records and cleanup.\n'
 printf 'PASS: initial absence balances, atomic updates, isolation, private sharing and term archives.\n'

@@ -4,8 +4,8 @@ const profile = {
   full_name: "Attendance Test Student",
   student_identifier: "",
   academic_year: "2026–2027",
-  department: "Computer Science",
-  group_name: "Test",
+  department: "Formation de base",
+  group_name: "A1",
   semester: "Semester 1",
 };
 
@@ -128,8 +128,11 @@ test("registration, persisted attendance, risk simulator, corrections, exports, 
   page,
 }) => {
   await page.goto("/register");
+  await expect(page.getByLabel("Department", { exact: true }).locator('option:not([value=""])')).toHaveText(["Formation de base", "Formation supérieure"]);
+  await expect(page.getByLabel("Group", { exact: true }).locator('option:not([value=""])')).toHaveText(["A1", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3", "B4", "B5", "B6"]);
   await page.getByLabel("Full name", { exact: true }).fill(profile.full_name);
-  await page.getByLabel("Group", { exact: true }).fill(profile.group_name);
+  await page.getByLabel("Department", { exact: true }).selectOption(profile.department);
+  await page.getByLabel("Group", { exact: true }).selectOption(profile.group_name);
   await page.getByRole("button", { name: "Create my workspace" }).click();
   await expect(
     page.getByRole("heading", { name: "Your keys to Exclunich" }),
@@ -201,7 +204,16 @@ test("registration, persisted attendance, risk simulator, corrections, exports, 
     recurrence_start: futureDate,
     recurrence_end: futureDate,
   });
-  await page.reload();
+  await page.goto("/settings");
+  await page.getByLabel("Department", { exact: true }).selectOption("Formation supérieure");
+  await page.getByLabel("Group", { exact: true }).selectOption("B6");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect.poll(async () => (await api(page, "/api/data")).student.group_name).toBe("B6");
+  const changedProfile = await api(page, "/api/data");
+  expect(changedProfile.student.department).toBe("Formation supérieure");
+  expect(changedProfile.modules.find((item: { id: string }) => item.id === module.id).archived_at).toBeNull();
+  expect(changedProfile.attendance).toHaveLength(past.length);
+  await page.goto("/");
   await expect(
     page.getByText("One more absence of either type would trigger exclusion."),
   ).toBeVisible();
@@ -370,6 +382,10 @@ test("classmates share, import and revoke a timetable without sharing attendance
       action: "register",
       ...profile,
       full_name: "Recipient Test Student",
+      department: "Formation supérieure",
+      group_name: "B6",
+      academic_year: "2027–2028",
+      semester: "Semester 5",
     });
     accounts.push(recipient.token);
     await api(page, "/api/auth", { action: "confirm", saved: true });
@@ -395,6 +411,9 @@ test("classmates share, import and revoke a timetable without sharing attendance
     expect(imported.modules[0].id).not.toBe(module.id);
     expect(imported.modules[0].total_threshold).toBeNull();
     expect(imported.modules[0].unjustified_threshold).toBeNull();
+    expect(imported.modules[0].academic_year).toBe("2027–2028");
+    expect(imported.modules[0].semester).toBe("Semester 5");
+    expect(imported.student).toMatchObject({ department: "Formation supérieure", group_name: "B6", academic_year: "2027–2028", semester: "Semester 5" });
     await page.reload();
     await page.getByRole("button", { name: "Share / import" }).click();
     await page.getByRole("button", { name: "Use a token" }).click();

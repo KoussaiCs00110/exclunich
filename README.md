@@ -27,13 +27,15 @@ Set these values in `.env.local`:
 - `APP_URL`: `http://localhost:3000` for development; the exact HTTPS origin in production.
 - `SUPABASE_URL` and `SUPABASE_SECRET_KEY`: the project's URL and **server secret** API key. The older JWT service-role key can instead be supplied as `SUPABASE_SERVICE_ROLE_KEY`.
 
-For a new project, apply all SQL files in `supabase/migrations` in numbered order using the Supabase SQL editor as database owner. For an existing installation, apply only pending migrations; do not rerun installed migrations. After sharing, install [automatic term archiving](supabase/migrations/202611210001_term_archiving.sql), [academic-calendar enforcement](supabase/migrations/202611210002_academic_calendar.sql), and [starting absence balances](supabase/migrations/202611210003_initial_absences.sql). This installs the schema, constraints, indexes, RLS and restricted RPCs. There are no public browser credentials to configure.
+For a new project, apply all SQL files in `supabase/migrations` in numbered order using the Supabase SQL editor as database owner. For an existing installation, apply only pending migrations; do not rerun installed migrations. After sharing, install [automatic term archiving](supabase/migrations/202611210001_term_archiving.sql), [academic-calendar enforcement](supabase/migrations/202611210002_academic_calendar.sql), [starting absence balances](supabase/migrations/202611210003_initial_absences.sql), and [profile-independent timetable sharing](supabase/migrations/202611220001_open_timetable_sharing.sql). This installs the schema, constraints, indexes, RLS and restricted RPCs. There are no public browser credentials to configure.
 
 ```bash
 npm run dev
 ```
 
 Open `http://localhost:3000`, register, save the access token and separate recovery code, and explicitly confirm that both are saved. Then add modules and sessions. Only sessions that have ended can receive attendance records. New accounts start empty.
+
+Registration and profile settings offer **Formation de base** and **Formation supérieure**, with groups **A1–A6** and **B1–B6**. The server validates these choices and normalizes recognized case/accent or hyphen variants. Older saved values stay readable; profile editing requires choosing a supported value rather than guessing a replacement. Department/group edits preserve the timetable and attendance. These self-reported profile choices do not authorize access to shared schedules.
 
 ### Direct PostgreSQL alternative
 
@@ -177,14 +179,14 @@ The interface uses forest green, sage, ivory and terracotta, with separate acces
 
 Page entrances, staggered cards, hover feedback and dialog transitions use CSS. Chart animations also follow the device’s reduced-motion setting. No animation package or remote font service is required.
 
-## Share a timetable with your group
+## Share a timetable using a token
 
 Open **My Timetable → Share / import → Share mine**, choose a name and expiry, and copy the generated `EXSH-…` token. Give this timetable token to classmates; your account login token remains private. Tokens expire after 1, 7 or 30 days and can be revoked from the same panel. The token is shown once and only its cryptographic hash is stored.
 
-Classmates use **Share / import → Use a token**, preview the modules and weekly sessions, then import. Group, department, academic year and semester must match the saved profiles, with case and whitespace normalized. Profile group declarations are self-reported, not university-verified membership. The timezone must match before importing.
+Students use **Share / import → Use a token**, preview the modules and weekly sessions, then import. A valid, unexpired, unrevoked token grants access regardless of group, department, academic year or semester. Imported modules belong to the recipient's currently saved year and semester; importing never changes their profile. The timezone must still match before importing so weekly class hours remain consistent. Install `202611220001_open_timetable_sharing.sql` to remove the older database profile checks; before installation, the app identifies that restriction as a required administrator update.
 
 Shares are frozen schedule snapshots. Imported schedules become independent copies; changes do not synchronize. Attendance, notes, account details and individual exclusion thresholds never transfer. Matching module codes and names are reused without changing the recipient's settings. Conflicting or archived module codes must be resolved first. Source session mappings and import receipts prevent duplicate imports, including when the owner generates a second token for the same series. Revocation stops future access but leaves imported personal copies intact.
 
-The local demo supports token creation, preview and revocation. A demo token belongs to the existing demo account, so importing it into that same account is prevented. Use two real test accounts with matching groups for the complete cross-student workflow. Run `npm run test:db:offline` for real PostgreSQL tests of import ownership, privacy, duplicate prevention, group checks, expiry and revocation.
+The local demo supports token creation, preview and revocation. A demo token belongs to the existing demo account, so importing it into that same account is prevented. Use two real test accounts with different profiles for the complete cross-student workflow. Run `npm run test:db:offline` for real PostgreSQL tests of import ownership, privacy, duplicate prevention, profile-independent access, expiry and revocation.
 
 Existing database RPC names, session cookies and access-token prefixes are retained across the Exclunich rename so existing accounts and pending recovery attempts continue to work.

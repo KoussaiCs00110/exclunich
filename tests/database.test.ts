@@ -15,6 +15,13 @@ afterEach(() => {
 });
 
 describe("Supabase HTTP adapter", () => {
+  it("identifies an old sharing restriction without telling students to alter their profile", async () => {
+    vi.stubEnv("SUPABASE_URL", "https://project.supabase.co");
+    const fetch = vi.fn().mockResolvedValue(Response.json({ code: "22023", message: "This timetable is for a different group, department, academic year or semester. Check your profile." }, { status: 400 }));
+    vi.stubGlobal("fetch", fetch);
+    await expect(rpc("import", {}, "session", "exclunich_sharing")).rejects.toMatchObject({ status: 503, code: "MIGRATION_REQUIRED" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it("uses the atomic module balance endpoint", async () => {
     vi.stubEnv("SUPABASE_URL", "https://project.supabase.co");
     const fetch = vi.fn().mockResolvedValue(Response.json({ id: "module" }));

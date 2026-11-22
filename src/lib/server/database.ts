@@ -14,6 +14,8 @@ export class ApiError extends Error {
 }
 const globalDb = globalThis as unknown as { absentiaPool?: Pool };
 function mapDatabaseError(code: string | undefined, message: string, functionName?: string): never {
+  if (functionName === "exclunich_sharing" && code === "22023" && message.startsWith("This timetable is for a different group, department, academic year or semester."))
+    throw new ApiError("Timetable imports need an administrator update. Your profile and timetable have not been changed.", 503, "MIGRATION_REQUIRED");
   if (functionName === "exclunich_module_save" && ["42883", "PGRST202"].includes(code ?? ""))
     throw new ApiError("Starting absence balances are not enabled yet. Ask the administrator to enable this feature. Your module has not been changed.", 503, "MIGRATION_REQUIRED");
   if (code === "28000") throw new ApiError(message, 401, "UNAUTHORIZED");

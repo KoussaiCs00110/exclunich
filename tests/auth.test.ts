@@ -81,8 +81,8 @@ describe("passwordless credentials", () => {
 const profile = {
   full_name: "Amine Student",
   academic_year: "2026/2027",
-  department: "Computer Science",
-  group_name: "G1",
+  department: "Formation de base",
+  group_name: "A1",
   semester: "S3",
 };
 const uuid = "a15ab004-3d36-4628-b2f5-08e76bbcae8a";
@@ -97,6 +97,16 @@ const session = {
   recurrence_end: "2027-01-04",
 };
 describe("server input validation", () => {
+  it("restricts academic choices and normalizes recognized legacy spellings", () => {
+    const parsed = authSchema.parse({ action: "register", ...profile, department: "formation superieure", group_name: "b-3" });
+    expect(parsed).toMatchObject({ department: "Formation supérieure", group_name: "B3" });
+    for (const department of ["Formation de base", "Formation supérieure"])
+      for (const group_name of ["A1", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3", "B4", "B5", "B6"])
+        expect(authSchema.safeParse({ action: "register", ...profile, department, group_name }).success).toBe(true);
+    for (const field of ["department", "group_name"])
+      for (const value of ["", "Computer Science", "A7", "B0", "C1"])
+        expect(authSchema.safeParse({ action: "register", ...profile, [field]: value }).success).toBe(false);
+  });
   it("accepts optional starting balances and rejects invalid counts", () => {
     const module = { action: "module_save", name: "Networks", code: "NET", color: "#628b75", semester: "S3" };
     expect(dataSchema.parse(module)).not.toHaveProperty("initial_justified_absences");

@@ -27,13 +27,14 @@ import { Modal } from "./modal";
 import { SecretDisplay } from "./auth-page";
 import { downloadFile, requestApi } from "@/lib/client";
 import { t } from "@/lib/i18n";
+import { DEPARTMENTS, GROUPS, normalizeDepartment, normalizeGroup } from "@/lib/academic-profile";
 
 const settingsSchema = z.object({
   full_name: z.string().trim().min(2, "Enter your full name.").max(100),
   student_identifier: z.string().trim().max(60),
   academic_year: z.string().trim().min(1).max(30),
-  department: z.string().trim().min(1).max(100),
-  group_name: z.string().trim().min(1).max(40),
+  department: z.string().refine((value) => DEPARTMENTS.some((department) => department === value), "Choose Formation de base or Formation supérieure."),
+  group_name: z.string().refine((value) => GROUPS.some((group) => group === value), "Choose a group from A1–A6 or B1–B6."),
   semester: z.string().trim().min(1).max(30),
   timezone: z.string().min(1),
   language: z.enum(["en", "fr"]),
@@ -62,8 +63,8 @@ export function SettingsPage() {
       full_name: data.student.full_name,
       student_identifier: data.student.student_identifier ?? "",
       academic_year: data.student.academic_year,
-      department: data.student.department,
-      group_name: data.student.group_name,
+      department: normalizeDepartment(data.student.department),
+      group_name: normalizeGroup(data.student.group_name),
       semester: data.student.semester,
       timezone: data.student.timezone,
       language: data.student.language,
@@ -140,7 +141,8 @@ export function SettingsPage() {
         setBusy(false);
       }
     },
-    () => {
+    (invalid) => {
+      if (invalid.department || invalid.group_name) setSection("profile");
       setError(
         phrase(
           "Check the highlighted fields before saving.",
@@ -330,11 +332,14 @@ export function SettingsPage() {
                     <label htmlFor="settings-department">
                       {t(lang, "department")}
                     </label>
-                    <input
+                    <select
                       id="settings-department"
                       className="input"
                       {...register("department")}
-                    />
+                    >
+                      <option value="" disabled>{t(lang, "auth.departmentPlaceholder")}</option>
+                      {DEPARTMENTS.map((department) => <option key={department} value={department}>{department}</option>)}
+                    </select>
                     {errors.department && (
                       <span className="field-error">
                         {errors.department.message}
@@ -343,11 +348,14 @@ export function SettingsPage() {
                   </div>
                   <div className="field">
                     <label htmlFor="settings-group">{t(lang, "group")}</label>
-                    <input
+                    <select
                       id="settings-group"
                       className="input"
                       {...register("group_name")}
-                    />
+                    >
+                      <option value="" disabled>{t(lang, "auth.groupPlaceholder")}</option>
+                      {GROUPS.map((group) => <option key={group} value={group}>{group}</option>)}
+                    </select>
                     {errors.group_name && (
                       <span className="field-error">
                         {errors.group_name.message}

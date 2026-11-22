@@ -55,13 +55,6 @@ export interface TimetableSharePreview extends TimetableShareInfo {
   is_owner: boolean;
 }
 export class SharingError extends Error {}
-export function sameCohort(a: SharedCohort, b: SharedCohort) {
-  const normalized = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
-  return (
-    ["group_name", "department", "academic_year", "semester"] as const
-  ).every((key) => normalized(a[key]) === normalized(b[key]));
-}
-
 /** Explicit allowlist: account details, attendance, notes and risk settings never travel. */
 export function buildTimetableSnapshot(data: AppData): TimetableSnapshot {
   const { group_name, department, academic_year, semester, timezone } =
@@ -164,10 +157,6 @@ export function importTimetableSnapshot(
   snapshot: TimetableSnapshot,
   importedSources: Record<string, string> = {},
 ) {
-  if (!sameCohort(target.student, snapshot.cohort))
-    throw new SharingError(
-      "This timetable is for a different group, department, academic year or semester. Check your profile.",
-    );
   if (target.student.timezone !== snapshot.timezone)
     throw new SharingError(
       `Set your timezone to ${snapshot.timezone} before importing this timetable.`,

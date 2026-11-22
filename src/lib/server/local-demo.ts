@@ -12,7 +12,6 @@ import { ApiError } from "./database";
 import {
   buildTimetableSnapshot,
   importTimetableSnapshot,
-  sameCohort,
   SharingError,
   type TimetableSnapshot,
   type TimetableShareInfo,
@@ -460,10 +459,6 @@ export async function localDemoSharing(
     if (!share)
       throw new SharingError(
         "This timetable token is invalid, expired or revoked.",
-      );
-    if (!sameCohort(state.data.student, share.snapshot.cohort))
-      throw new SharingError(
-        "This timetable is for a different group, department, academic year or semester. Check your profile.",
       );
     const already_imported = share.imported_by.includes(state.data.student.id),
       is_owner = share.owner_id === state.data.student.id;

@@ -285,8 +285,8 @@ export function TimetableSharing({
               )}
               <p className="sharing-caption">
                 {phrase(
-                  "Classmates need a matching group, department, academic year and semester in their profile. Imported timetables become independent copies; later edits do not sync. Profile group information is self-reported.",
-                  "Le profil du destinataire doit correspondre au groupe, département, année et semestre. Les copies importées sont indépendantes ; les modifications ultérieures ne sont pas synchronisées. Le groupe du profil est déclaré par l’étudiant.",
+                  "Anyone with a valid sharing token can preview and import this timetable, regardless of group, department, academic year or semester. Classes are copied into the recipient’s current term; profile details are not changed. Later edits do not sync.",
+                  "Toute personne disposant d’un jeton valide peut consulter et importer cet emploi du temps, quels que soient son groupe, département, année ou semestre. Les séances sont copiées dans sa période actuelle sans modifier son profil. Les modifications ultérieures ne sont pas synchronisées.",
                 )}
               </p>
               <div className="sharing-list-heading">

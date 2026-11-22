@@ -67,7 +67,8 @@ export const authMessages = {
     "auth.showToken": "Show token",
     "auth.recoveryHelp":
       "Use the recovery code saved separately at registration.",
-    "auth.tokenHelp": "Your token was provided when you registered.",
+    "auth.tokenHelp":
+      "This browser stays signed in for up to 180 days. Log out on shared devices.",
     "auth.recoverAccount": "Recover my account",
     "auth.login": "Log in to Exclunich",
     "auth.existingWorkspace": "Already have a workspace?",
@@ -165,7 +166,7 @@ export const authMessages = {
     "auth.recoveryHelp":
       "Utilisez le code de récupération sauvegardé séparément lors de votre inscription.",
     "auth.tokenHelp":
-      "Votre jeton vous a été fourni lors de votre inscription.",
+      "Ce navigateur reste connecté jusqu’à 180 jours. Déconnectez-vous sur les appareils partagés.",
     "auth.recoverAccount": "Récupérer mon compte",
     "auth.login": "Se connecter à Exclunich",
     "auth.existingWorkspace": "Vous avez déjà un espace ?",

@@ -661,12 +661,11 @@ export default function AuthPage({
                     </button>
                   </div>
                 </div>
-                <small>
-                  {t(
-                    language,
-                    mode === "recover" ? "auth.recoveryHelp" : "auth.tokenHelp",
-                  )}
-                </small>
+                {!localDemo && (
+                  <small>
+                    {t(language, mode === "recover" ? "auth.recoveryHelp" : "auth.tokenHelp")}
+                  </small>
+                )}
               </div>
               <button
                 className="btn btn-primary"

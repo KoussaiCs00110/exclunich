@@ -11,18 +11,34 @@ export const SESSION_COOKIE =
   process.env.NODE_ENV === "production"
     ? "__Host-absentia"
     : "absentia_session";
+// Keep in sync with the expiry of a new row in web_sessions.
+export const SESSION_MAX_AGE = 60 * 60 * 24 * 180;
 export const sessionCookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "strict" as const,
   path: "/",
-  maxAge: 60 * 60 * 24 * 14,
+  maxAge: SESSION_MAX_AGE,
 };
-export async function credentialFromCookie(): Promise<string> {
+async function browserSessionHash(): Promise<string | null> {
   const raw = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!raw || !/^[\w-]{43}$/.test(raw))
+  return raw && /^[\w-]{43}$/.test(raw) ? sessionHash(raw) : null;
+}
+export async function credentialFromCookie(): Promise<string> {
+  const credential = await browserSessionHash();
+  if (!credential)
     throw new ApiError("Please sign in to continue.", 401, "UNAUTHORIZED");
-  return sessionHash(raw);
+  return credential;
+}
+export async function getBrowserSession() {
+  const credential = await browserSessionHash();
+  if (!credential) return null;
+  try {
+    return await rpc<{ registration_complete: boolean }>("status", {}, credential);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return null;
+    throw error;
+  }
 }
 export const getStudentData = cache(async (): Promise<AppData> => {
   if (await localDemoEnabled()) return localDemoSnapshot();

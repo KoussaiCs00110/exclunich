@@ -620,8 +620,8 @@ export function SettingsPage() {
                   <h3>{phrase("Access token", "Jeton d’accès")}</h3>
                   <p>
                     {phrase(
-                      "Generate a new access token. Your previous token and all other sessions stop working immediately.",
-                      "Générez un nouveau jeton. L’ancien jeton et les autres sessions cessent de fonctionner immédiatement.",
+                      "Generate a new access token. This browser stays signed in. The old token and sessions in other browsers expire immediately.",
+                      "Générez un nouveau jeton. Ce navigateur reste connecté. L’ancien jeton et les sessions des autres navigateurs expirent immédiatement.",
                     )}
                   </p>
                 </div>

@@ -27,7 +27,7 @@ Set these values in `.env.local`:
 - `APP_URL`: `http://localhost:3000` for development; the exact HTTPS origin in production.
 - `SUPABASE_URL` and `SUPABASE_SECRET_KEY`: the project's URL and **server secret** API key. The older JWT service-role key can instead be supplied as `SUPABASE_SERVICE_ROLE_KEY`.
 
-For a new project, apply all SQL files in `supabase/migrations` in numbered order using the Supabase SQL editor as database owner. For an existing installation, apply only pending migrations; do not rerun installed migrations. After sharing, install [automatic term archiving](supabase/migrations/202611210001_term_archiving.sql), [academic-calendar enforcement](supabase/migrations/202611210002_academic_calendar.sql), [starting absence balances](supabase/migrations/202611210003_initial_absences.sql), [profile-independent timetable sharing](supabase/migrations/202611220001_open_timetable_sharing.sql), and [session-type absence balances](supabase/migrations/202611220002_session_type_absences.sql). This installs the schema, constraints, indexes, RLS and restricted RPCs. There are no public browser credentials to configure.
+For a new project, apply all SQL files in `supabase/migrations` in numbered order using the Supabase SQL editor as database owner. For an existing installation, apply only pending migrations; do not rerun installed migrations. After sharing, install [automatic term archiving](supabase/migrations/202611210001_term_archiving.sql), [academic-calendar enforcement](supabase/migrations/202611210002_academic_calendar.sql), [starting absence balances](supabase/migrations/202611210003_initial_absences.sql), [profile-independent timetable sharing](supabase/migrations/202611220001_open_timetable_sharing.sql), [session-type absence balances](supabase/migrations/202611220002_session_type_absences.sql), and [longer browser sessions](supabase/migrations/202611220003_longer_browser_sessions.sql). This installs the schema, constraints, indexes, RLS and restricted RPCs. There are no public browser credentials to configure.
 
 ```bash
 npm run dev
@@ -96,14 +96,14 @@ Notifications are built from the shared calculation engine after mutations and r
 ## Authentication and data security
 
 - Access and recovery credentials contain 32 randomly generated readable characters, grouped for copying. Only domain-separated HMAC-SHA256 hashes are stored.
-- A successful login issues an independent random 256-bit session. The database stores its SHA256 hash, revocation state and absolute 14-day expiry.
+- Each successful sign-in issues a new random 256-bit browser session. The database stores its SHA256 hash and a 180-day absolute expiry for new sessions. A browser with a valid session can reopen the workspace from the login page. Sessions issued before the migration keep their original expiry.
 - Production cookies use `__Host-absentia`, `HttpOnly`, `Secure`, `SameSite=Strict` and path `/`. Development uses a local cookie name.
 - Protected server layouts and every database operation verify a live session. Student identity comes from that session, never a client-supplied `student_id`.
 - All tables have RLS enabled with no public browser policies or browser grants. Only the trusted server role can execute the API function. The service role bypasses RLS; the RPC explicitly verifies ownership and uses composite foreign keys. This design does **not** expose service credentials or use the permanent access token as a Supabase credential.
 - Account operations serialize on the student row and recheck session validity after waiting, preventing token-login/revocation races.
 - Auth attempt limits live in PostgreSQL, so they survive server restarts and run before credential validation. Credential and network buckets use HMACs. Without a trusted proxy, network limiting uses a shared bucket. Defaults are 240 auth attempts and 60 registrations per 15 minutes; credential-specific limits remain 8. `AUTH_NETWORK_LIMIT` and `REGISTRATION_NETWORK_LIMIT` can be tuned for shared campus networks. Production should also use platform abuse controls.
 - Mutations require JSON and an exact matching `Origin`. Production refuses mutations without `APP_URL`. Inputs are validated with Zod; database constraints provide an additional boundary.
-- Token rotation requires the current token and revokes every older session and token immediately. Recovery-code rotation also requires the current token.
+- Regenerating the access token requires the current token, signs out older sessions and issues a fresh session to the current browser. Recovery-code rotation also requires the current access token.
 - Attendance corrections retain before/after audit entries. Saving an unchanged record is idempotent. Notifications have database-enforced deduplication.
 
 ### Recovery and interrupted requests

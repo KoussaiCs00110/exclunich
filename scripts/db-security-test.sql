@@ -10,10 +10,22 @@ declare
 begin
  reply:=public.absentia_api('register',jsonb_build_object('full_name','A Test Student','academic_year','2026/2027','department','Computer Science','group_name','G1','semester','S3','token_hash',token_a,'recovery_hash',recovery_a,'session_hash',credential_a));
  student_a:=(reply->>'student_id')::uuid;
+ if (select expires_at - created_at from public.web_sessions where session_hash=credential_a) is distinct from interval '4320 hours' then
+  raise exception 'FAIL: registration session does not last 180 days';
+ end if;
  denied:=false;
  begin perform public.absentia_api('snapshot','{}',credential_a); exception when insufficient_privilege then denied:=true; end;
  if not denied then raise exception 'FAIL: incomplete registration accessed dashboard'; end if;
  perform public.absentia_api('confirm','{}',credential_a);
+ reply:=public.absentia_api('login',jsonb_build_object('token_hash',token_a,'session_hash',repeat('a1',32)));
+ if not (reply->>'registration_complete')::boolean or
+    (select expires_at - created_at from public.web_sessions where session_hash=repeat('a1',32)) is distinct from interval '4320 hours' then
+  raise exception 'FAIL: login session does not last 180 days';
+ end if;
+ update public.web_sessions set expires_at=now() where session_hash=repeat('a1',32);
+ denied:=false;
+ begin perform public.absentia_api('status','{}',repeat('a1',32)); exception when invalid_authorization_specification then denied:=true; end;
+ if not denied then raise exception 'FAIL: expired browser session accepted'; end if;
  reply:=public.absentia_api('register',jsonb_build_object('full_name','B Test Student','language','fr','academic_year','2026/2027','department','Computer Science','group_name','G2','semester','S3','token_hash',token_b,'recovery_hash',recovery_b,'session_hash',credential_b));
  student_b:=(reply->>'student_id')::uuid;
  if (select language from public.students where id=student_b)<>'fr' then raise exception 'FAIL: registration language not persisted'; end if;
@@ -66,6 +78,9 @@ begin
  begin perform public.absentia_api('attendance_save',jsonb_build_object('occurrence_id',occurrence_a,'attendance_status','unjustified'),credential_a); exception when invalid_parameter_value then denied:=true; end;
  if not denied then raise exception 'FAIL: future attendance accepted'; end if;
  perform public.absentia_api('rotate_token',jsonb_build_object('current_token_hash',token_a,'token_hash',repeat('1',64),'session_hash',repeat('2',64)),credential_a);
+ if (select expires_at - created_at from public.web_sessions where session_hash=repeat('2',64)) is distinct from interval '4320 hours' then
+  raise exception 'FAIL: replacement browser session does not last 180 days';
+ end if;
  denied:=false;
  begin perform public.absentia_api('snapshot','{}',credential_a); exception when invalid_authorization_specification then denied:=true; end;
  if not denied then raise exception 'FAIL: rotation did not revoke old session'; end if;

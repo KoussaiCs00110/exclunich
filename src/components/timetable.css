@@ -370,9 +370,17 @@
 .timetable-calendar .fc .fc-list-event .calendar-event-content {
   gap: 0.25rem;
   padding: 0.25rem;
+  height: auto;
+  overflow: visible;
 }
 .timetable-calendar .fc .fc-list-event .calendar-event-content strong {
   font-size: 0.9375rem;
+  flex-basis: 100%;
+  order: 1;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
 }
 .timetable-calendar .fc .fc-list-event .calendar-event-time {
   display: none;
@@ -380,9 +388,11 @@
 .timetable-calendar .fc .fc-list-event .calendar-event-room {
   font-size: 0.8125rem;
   margin-top: 0.15rem;
+  overflow-wrap: anywhere;
 }
 .timetable-calendar .fc .fc-list-event .calendar-event-top {
   justify-content: flex-start;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 .timetable-calendar .fc .fc-list-event .calendar-event-top > span:first-child {
@@ -397,30 +407,47 @@
 .session-backdrop {
   position: fixed;
   inset: 0;
+  top: var(--session-viewport-top, 0px);
+  bottom: auto;
+  height: var(--session-viewport-height, 100dvh);
   z-index: 100;
   background: rgba(3, 8, 19, 0.74);
   backdrop-filter: blur(5px);
   display: flex;
   justify-content: flex-end;
-  overflow: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
 }
 .session-panel {
   width: min(550px, 100%);
-  min-height: 100%;
-  height: fit-content;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--surface, #111a2a);
   border-left: 1px solid var(--border, #253047);
-  padding: 1.5rem 1.75rem;
+  padding: 0;
   color: var(--text, #e7edf7);
   box-shadow: -20px 0 100px #0004;
+}
+.session-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 0 1.75rem 1.25rem;
+  scroll-padding-block: 1rem;
 }
 .session-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.2rem;
+  flex-shrink: 0;
+  margin-bottom: 0;
+  padding: max(1rem, env(safe-area-inset-top)) 1.75rem 1rem;
+  border-bottom: 1px solid var(--border);
 }
 .session-panel-header h2 {
   margin: 0.4rem 0 0;
@@ -451,6 +478,10 @@
 .session-module-heading .muted {
   font-size: 0.8125rem;
 }
+.session-module-heading > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .session-module-heading h2 {
   margin: 0.35rem 0 0;
   font-size: 1.65rem;
@@ -468,6 +499,7 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  overflow-wrap: anywhere;
 }
 .session-metadata svg {
   color: var(--muted, #8997af);
@@ -737,9 +769,11 @@
 }
 .session-panel-footer {
   display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 1rem 0 0.5rem;
+  padding: 1rem 1.75rem max(1rem, env(safe-area-inset-bottom));
   border-top: 1px solid var(--border, #253047);
 }
 .session-panel-footer .btn {
@@ -914,7 +948,7 @@
     display: none;
   }
 }
-@media (max-width: 720px) {
+@media (max-width: 720px), (max-height: 500px) and (pointer: coarse) {
   .timetable-heading {
     align-items: flex-start;
   }
@@ -962,12 +996,34 @@
   .timetable-calendar .fc .fc-toolbar {
     gap: 0.7rem;
   }
+  .timetable-calendar .fc .fc-list-table {
+    table-layout: auto;
+    width: 100%;
+  }
+  .timetable-calendar .fc .fc-list-event-time,
+  .timetable-calendar .fc .fc-list-event-graphic {
+    display: none;
+  }
+  .timetable-calendar .fc .fc-list-event-title {
+    width: 100%;
+    padding: 0.85rem 0.6rem;
+  }
+  .timetable-calendar .fc .fc-list-event .calendar-event-time {
+    display: block;
+    font-size: 0.8125rem;
+  }
   .timetable-footer {
     padding: 1rem;
     font-size: 0.75rem;
   }
-  .session-panel {
-    padding: 1.2rem;
+  .session-panel-body {
+    padding: 0 1.2rem 1.2rem;
+  }
+  .session-panel-header {
+    padding-inline: 1.2rem;
+  }
+  .session-panel-footer {
+    padding-inline: 1.2rem;
   }
   .session-metadata small {
     margin-left: 0;

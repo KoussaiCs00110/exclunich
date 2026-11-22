@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatInTimeZone } from "date-fns-tz";
 import {
   CalendarDays,
@@ -44,6 +45,9 @@ export function SessionPanel({
   onEdit,
 }: SessionPanelProps) {
   const panelRef = useRef<HTMLElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  const [overlayRoot, setOverlayRoot] = useState<HTMLElement | null>(null);
   const liveOccurrence =
     data.occurrences.find((item) => item.id === occurrence.id) ?? occurrence;
   const module = data.modules.find(
@@ -66,6 +70,11 @@ export function SessionPanel({
   const lang = data.student.language;
   const phrase = (en: string, fr: string) => (lang === "fr" ? fr : en);
   const completed = new Date(liveOccurrence.ends_at).getTime() <= Date.now();
+  const visible = Boolean(module && overlayRoot);
+
+  useEffect(() => {
+    setOverlayRoot(document.body);
+  }, []);
 
   useEffect(() => {
     setStatus(attendance?.attendance_status ?? "present");
@@ -78,15 +87,37 @@ export function SessionPanel({
   ]);
 
   useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const resize = () => {
+      backdropRef.current?.style.setProperty("--session-viewport-height", `${viewport.height}px`);
+      backdropRef.current?.style.setProperty("--session-viewport-top", `${viewport.offsetTop}px`);
+    };
+    resize();
+    viewport.addEventListener("resize", resize);
+    viewport.addEventListener("scroll", resize);
+    return () => {
+      viewport.removeEventListener("resize", resize);
+      viewport.removeEventListener("scroll", resize);
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
     const previous = document.body.style.overflow;
     const previousFocus =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
     document.body.style.overflow = "hidden";
-    panelRef.current?.focus();
+    panelRef.current?.focus({ preventScroll: true });
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") closeRef.current();
       if (event.key !== "Tab") return;
       const elements = Array.from(
         panelRef.current?.querySelectorAll<HTMLElement>(
@@ -111,11 +142,11 @@ export function SessionPanel({
     return () => {
       document.body.style.overflow = previous;
       document.removeEventListener("keydown", handleKey);
-      previousFocus?.focus();
+      previousFocus?.focus({ preventScroll: true });
     };
-  }, [onClose]);
+  }, [visible]);
 
-  if (!module) return null;
+  if (!module || !overlayRoot) return null;
   const stats = getModuleStats(module, data);
   const simulation = simulateAbsence(stats, scenario);
   const otherSimulation = simulateAbsence(
@@ -222,8 +253,9 @@ export function SessionPanel({
     }
   }
 
-  return (
+  return createPortal(
     <div
+      ref={backdropRef}
       className="session-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -251,6 +283,7 @@ export function SessionPanel({
             <X size={20} />
           </button>
         </header>
+        <div className="session-panel-body">
         <div className="session-module-heading">
           <span
             className="module-color-mark"
@@ -590,6 +623,7 @@ export function SessionPanel({
             </ul>
           </section>
         )}
+        </div>
         <footer className="session-panel-footer">
           {onEdit && (
             <button
@@ -613,7 +647,8 @@ export function SessionPanel({
           </button>
         </footer>
       </section>
-    </div>
+    </div>,
+    overlayRoot,
   );
 }
 

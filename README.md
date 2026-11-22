@@ -66,6 +66,8 @@ Balances are private, never included in timetable shares, and preserved in archi
 
 The timetable runs from Sunday through Saturday for every account. Older profile settings cannot hide Sunday sessions. Weekly and daily views, the mobile agenda and session details use the same complete schedule.
 
+Phone agendas show full module names on wrapping lines, with the time and room underneath. Short touch-screen landscape views also use the agenda. Session details and the session editor render outside the animated page so they stay above navigation; the details panel fits the visible viewport, keeps its header and bottom actions visible, and scrolls its contents independently with safe-area padding.
+
 The shared academic calendar applies to every student's own timetable. For 2026–2027, regular classes are excluded on these inclusive dates:
 
 | Period | First day | Last day |

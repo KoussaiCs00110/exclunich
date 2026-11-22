@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -126,7 +127,7 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
   );
 
   useEffect(() => {
-    const query = window.matchMedia("(max-width: 720px)");
+    const query = window.matchMedia("(max-width: 720px), (max-height: 500px) and (pointer: coarse)");
     const change = () => {
       setMobile(query.matches);
       calendarRef.current
@@ -704,6 +705,8 @@ function SessionEditor({
   onDuplicate,
 }: EditorProps) {
   const editorRef = useRef<HTMLElement>(null);
+  const [overlayRoot, setOverlayRoot] = useState<HTMLElement | null>(null);
+  useEffect(() => { setOverlayRoot(document.body); }, []);
   const timezone = data.student.timezone || "Africa/Algiers";
   const phrase = (en: string, fr: string) =>
     data.student.language === "fr" ? fr : en;
@@ -810,13 +813,14 @@ function SessionEditor({
     setAllowOverlap(false);
   }, [draft.date, draft.start_time, draft.end_time, draft.repeat_weeks]);
   useEffect(() => {
+    if (!overlayRoot) return;
     const previous = document.body.style.overflow;
     const previousFocus =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
     document.body.style.overflow = "hidden";
-    editorRef.current?.focus();
+    editorRef.current?.focus({ preventScroll: true });
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
       if (event.key !== "Tab") return;
@@ -843,9 +847,9 @@ function SessionEditor({
     return () => {
       document.body.style.overflow = previous;
       document.removeEventListener("keydown", handleKey);
-      previousFocus?.focus();
+      previousFocus?.focus({ preventScroll: true });
     };
-  }, [onClose]);
+  }, [onClose, overlayRoot]);
 
   function field<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -931,7 +935,8 @@ function SessionEditor({
     }
   }
 
-  return (
+  if (!overlayRoot) return null;
+  return createPortal(
     <div
       className="session-backdrop"
       onMouseDown={(event) => {
@@ -1252,7 +1257,8 @@ function SessionEditor({
           </footer>
         )}
       </section>
-    </div>
+    </div>,
+    overlayRoot,
   );
 }
 

@@ -195,7 +195,7 @@ test("registration, persisted attendance, risk simulator, corrections, exports, 
   await api(page, "/api/data", {
     action: "session_save",
     module_id: module.id,
-    session_type: "Lecture",
+    session_type: "TD",
     weekday: new Date(`${futureDate}T12:00:00Z`).getUTCDay() || 7,
     start_time: "11:00",
     end_time: "12:00",
@@ -205,9 +205,13 @@ test("registration, persisted attendance, risk simulator, corrections, exports, 
     recurrence_end: futureDate,
   });
   await page.goto("/settings");
-  await page.getByLabel("Department", { exact: true }).selectOption("Formation supérieure");
+  const saveProfile = page.getByRole("button", { name: "Save changes", exact: true });
+  await expect(async () => {
+    await page.getByLabel("Department", { exact: true }).selectOption("Formation supérieure");
+    await expect(saveProfile).toBeEnabled({ timeout: 1000 });
+  }).toPass({ timeout: 10000 });
   await page.getByLabel("Group", { exact: true }).selectOption("B6");
-  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await saveProfile.click();
   await expect.poll(async () => (await api(page, "/api/data")).student.group_name).toBe("B6");
   const changedProfile = await api(page, "/api/data");
   expect(changedProfile.student.department).toBe("Formation supérieure");

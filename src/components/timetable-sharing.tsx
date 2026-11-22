@@ -59,8 +59,14 @@ export function TimetableSharing({
     }
   };
   useEffect(() => {
-    if (open) void load();
-  }, [open]);
+    if (new URLSearchParams(window.location.search).get("import") === "1") {
+      setTab("import");
+      setOpen(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (open && tab === "share") void load();
+  }, [open, tab]);
   const perform = async (operation: () => Promise<void>) => {
     setBusy(true);
     setError("");
@@ -152,6 +158,7 @@ export function TimetableSharing({
               type="button"
               disabled={busy}
               className={tab === "share" ? "active" : ""}
+              aria-pressed={tab === "share"}
               onClick={() => {
                 setTab("share");
                 setError("");
@@ -164,6 +171,7 @@ export function TimetableSharing({
               type="button"
               disabled={busy}
               className={tab === "import" ? "active" : ""}
+              aria-pressed={tab === "import"}
               onClick={() => {
                 setTab("import");
                 setError("");

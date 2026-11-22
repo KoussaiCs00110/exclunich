@@ -17,6 +17,7 @@ test("a student joining mid-semester saves, corrects and resets earlier absences
     await expect(dialog).toBeVisible();
     await dialog.getByLabel("Module name", { exact: true }).fill("Mid-semester Networks");
     await dialog.getByLabel("Module code", { exact: true }).fill("MID");
+    await dialog.getByText("Absences before Exclunich", { exact: true }).click();
     await dialog.getByLabel("TD · Earlier justified absences", { exact: true }).fill("1");
     await dialog.getByLabel("TD · Earlier unjustified absences", { exact: true }).fill("2");
     await dialog.getByRole("button", { name: "Create module", exact: true }).click();
@@ -39,8 +40,10 @@ test("a student joining mid-semester saves, corrects and resets earlier absences
     await page.goto("/statistics");
     const absenceTotal = page.locator(".stats-grid .stat-card").filter({ hasText: "Total absences" }).locator(".stat-value");
     await expect(absenceTotal).toHaveText("3");
-    await page.getByLabel("From", { exact: true }).fill("2024-01-01");
-    await expect(absenceTotal).toHaveText("0");
+    await expect(async () => {
+      await page.getByLabel("From", { exact: true }).fill("2024-01-01");
+      await expect(absenceTotal).toHaveText("0", { timeout: 1000 });
+    }).toPass({ timeout: 10000 });
     await expect(page.locator(".stats-grid .stat-card").filter({ hasText: "Modules at risk" }).locator(".stat-value")).toHaveText("1");
     await page.goto(`/modules/${module.id}`);
     await page.getByRole("button", { name: "Edit module", exact: true }).click();

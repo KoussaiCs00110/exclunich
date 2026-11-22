@@ -18,6 +18,7 @@ import type {
 } from "@fullcalendar/core";
 import type { DateClickArg } from "@fullcalendar/interaction";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import Link from "next/link";
 import {
   AlertTriangle,
   CalendarDays,
@@ -28,8 +29,9 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { getSessionStats, SESSION_TYPES, simulateAbsence } from "@/lib/attendance";
+import { getSessionStats, getUpcomingSessions, SESSION_TYPES, simulateAbsence } from "@/lib/attendance";
 import { ACADEMIC_PERIODS, academicPeriodForDate, isNonTeachingOccurrence } from "@/lib/academic-calendar";
+import { localDateKey } from "@/lib/timezone";
 import type { AppData, Occurrence } from "@/lib/types";
 import { SessionPanel } from "./session-panel";
 import { Modal } from "./modal";
@@ -219,6 +221,17 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
     [data, moduleFilter, typeFilter, risks, timezone],
   );
 
+  const hasFilters = moduleFilter !== "all" || typeFilter !== "all";
+  const nextSession = getUpcomingSessions(data, data.occurrences.length).find((occurrence) =>
+    (moduleFilter === "all" || moduleFilter === occurrence.module_id) &&
+    (typeFilter === "all" || typeFilter === occurrence.session_type) &&
+    (!visibleDates || localDateKey(occurrence.starts_at, timezone) > visibleDates.end),
+  );
+  const resetFilters = () => {
+    setModuleFilter("all");
+    setTypeFilter("all");
+  };
+
   async function runMutation(
     action: string,
     body: Record<string, unknown>,
@@ -292,16 +305,7 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
     <div className="timetable-page">
       <div className="page-heading timetable-heading">
         <div>
-          <span className="eyebrow">
-            {phrase("YOUR ACADEMIC WEEK", "VOTRE SEMAINE UNIVERSITAIRE")}
-          </span>
           <h1>{phrase("My timetable", "Mon emploi du temps")}</h1>
-          <p className="muted">
-            {phrase(
-              "Your week, with attendance in perspective.",
-              "Votre semaine, avec une vision claire de vos présences.",
-            )}
-          </p>
         </div>
         <div className="timetable-heading-actions">
           <TimetableSharing
@@ -340,7 +344,7 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
         <div className="card timetable-empty">
           <CalendarDays size={38} />
           <h2>
-            {phrase("Make room for your semester", "Préparez votre semestre")}
+            {phrase("Add your first module", "Ajoutez votre premier module")}
           </h2>
           <p className="muted">
             {phrase(
@@ -348,9 +352,9 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
               "Créez vos modules, puis ajoutez les cours, TD et TP à votre emploi du temps.",
             )}
           </p>
-          <a href="/modules" className="btn btn-primary">
+          <Link href="/modules?add=1" className="btn btn-primary">
             {phrase("Create a module", "Créer un module")}
-          </a>
+          </Link>
         </div>
       ) : (
         <>
@@ -399,6 +403,7 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
                   <option value="TP">TP</option>
                 </select>
               </label>
+              {hasFilters && <button type="button" onClick={resetFilters} className="btn btn-sm btn-ghost">{phrase("Reset filters", "Réinitialiser")}</button>}
               <span className="timetable-timezone">{timezone}</span>
             </div>
             <div className="timetable-period-notices" role="status" aria-live="polite">
@@ -516,12 +521,16 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
                 eventResize={moveEvent}
                 eventMinHeight={68}
                 height="auto"
-                noEventsContent={visiblePeriods.length > 0
-                  ? `${visiblePeriods.map((period) => period[lang]).join(" · ")}. ${suspendedMessage}`
-                  : phrase(
-                    "No sessions in this view. Add a session to start building your timetable.",
-                    "Aucune séance dans cette vue. Ajoutez une séance à votre emploi du temps.",
-                  )}
+                noEventsContent={(
+                  <div className="timetable-no-events">
+                    <p>{hasFilters ? phrase("No sessions match these filters.", "Aucune séance ne correspond à ces filtres.") : phrase("No sessions on these dates.", "Aucune séance à ces dates.")}</p>
+                    {nextSession && (
+                      <button type="button" className="btn btn-secondary" onClick={() => calendarRef.current?.getApi().gotoDate(nextSession.starts_at)}>
+                        {phrase("Go to next session", "Aller à la prochaine séance")}
+                      </button>
+                    )}
+                  </div>
+                )}
                 dayMaxEvents={false}
                 eventDidMount={(info: EventMountArg) => {
                   info.el.setAttribute(

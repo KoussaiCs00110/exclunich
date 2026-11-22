@@ -334,6 +334,22 @@ export function getOverview(data: AppData, now: Date | number = Date.now()) {
   };
 }
 
+export function getPendingSessions(
+  data: AppData,
+  now: Date | number = Date.now(),
+): Occurrence[] {
+  const recorded = latestAttendance(data);
+  return data.occurrences
+    .filter(
+      (occurrence) =>
+        !occurrence.cancelled &&
+        !recorded.has(occurrence.id) &&
+        hasSessionEnded(occurrence, now) &&
+        !isNonTeachingOccurrence(occurrence, data.student.timezone),
+    )
+    .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
+}
+
 export function getUpcomingSessions(
   data: AppData,
   limit = 5,

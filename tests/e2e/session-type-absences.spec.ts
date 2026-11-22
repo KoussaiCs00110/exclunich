@@ -24,6 +24,7 @@ test("session types keep independent counts, projections and exclusion states", 
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Module name", { exact: true }).fill("Independent session counts");
     await dialog.getByLabel("Module code", { exact: true }).fill("TYPES");
+    await dialog.getByText("Absences before Exclunich", { exact: true }).click();
     for (const type of ["Lecture", "TD", "TP"])
       await dialog.getByLabel(`${type} · Earlier unjustified absences`, { exact: true }).fill("1");
     await dialog.getByRole("button", { name: "Create module", exact: true }).click();

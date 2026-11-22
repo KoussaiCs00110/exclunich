@@ -98,10 +98,12 @@ export function ModuleEditor({
   return (
     <Modal
       title={t(lang, module ? "module.edit" : "module.new")}
-      description={t(lang, "module.editorBody")}
       onClose={onClose}
     >
-      <form onSubmit={submit}>
+      <form onSubmit={submit} onInvalidCapture={(event) => {
+        const details = (event.target as HTMLElement).closest("details");
+        if (details) details.open = true;
+      }}>
         {error && (
           <div className="form-error" role="alert">
             {error}
@@ -153,118 +155,128 @@ export function ModuleEditor({
               ))}
             </select>
           </div>
-          <div className="field span-2">
-            <label htmlFor="module-professor">
-              {t(lang, "module.professor")}
-            </label>
-            <input
-              className="input"
-              id="module-professor"
-              value={values.professor}
-              onChange={(e) => field("professor", e.target.value)}
-              maxLength={120}
-              placeholder={t(lang, "module.professorPlaceholder")}
-            />
-          </div>
-          <div className="field span-2">
-            <label htmlFor="module-description">
-              {t(lang, "module.description")}
-            </label>
-            <textarea
-              className="input"
-              id="module-description"
-              value={values.description}
-              onChange={(e) => field("description", e.target.value)}
-              maxLength={4000}
-              placeholder={t(lang, "module.descriptionPlaceholder")}
-            />
-          </div>
-          <div className="field span-2">
-            <label>{t(lang, "module.color")}</label>
-            <div
-              className="color-picker"
-              role="group"
-              aria-label={t(lang, "module.color")}
-            >
-              {colors.map((color) => (
-                <button
-                  className={`color-swatch ${values.color.toUpperCase() === color ? "selected" : ""}`}
-                  type="button"
-                  key={color}
-                  style={{ background: color }}
-                  onClick={() => field("color", color)}
-                  aria-label={t(lang, "module.selectColor", { color })}
-                  aria-pressed={values.color.toUpperCase() === color}
-                />
-              ))}
-            </div>
-          </div>
-          <fieldset className="span-2 initial-absence-fields" aria-describedby="initial-absence-help">
-            <legend>{t(lang, "module.initialTitle")}</legend>
-            <p id="initial-absence-help">{t(lang, "module.initialBody")}</p>
-            {SESSION_TYPES.map((type) => (
-              <div className="form-grid" key={type}>
-                {(["justified", "unjustified"] as const).map((kind) => (
-                  <div className="field" key={kind}>
-                    <label htmlFor={`module-initial-${type}-${kind}`}>{sessionTypeLabel(type, lang)} · {t(lang, kind === "justified" ? "module.initialJustified" : "module.initialUnjustified")}</label>
-                    <input className="input" id={`module-initial-${type}-${kind}`} type="number" min={0} max={1000} step={1}
-                      value={initialByType[type]?.[kind] ?? 0}
-                      onChange={(event) => setInitialByType((previous) => ({ ...previous, [type]: { justified: previous[type]?.justified ?? 0, unjustified: previous[type]?.unjustified ?? 0, [kind]: Number(event.target.value) } }))} />
-                  </div>
-                ))}
-              </div>
-            ))}
-            {((module?.initial_justified_absences ?? 0) + (module?.initial_unjustified_absences ?? 0) > 0) && (
-              <>
-                <p>{t(lang, "module.unassignedNotice", { count: (module?.initial_justified_absences ?? 0) + (module?.initial_unjustified_absences ?? 0) })}</p>
-                <div className="form-grid">
-                  {(["justified", "unjustified"] as const).map((kind) => {
-                    const key = kind === "justified" ? "initial_justified_absences" : "initial_unjustified_absences";
-                    return <div className="field" key={kind}>
-                      <label htmlFor={`module-unassigned-${kind}`}>{t(lang, "module.unassigned")} · {t(lang, kind === "justified" ? "module.initialJustified" : "module.initialUnjustified")}</label>
-                      <input className="input" id={`module-unassigned-${kind}`} type="number" min={0} max={1000} step={1} value={values[key]} onChange={(event) => field(key, event.target.value)} />
-                    </div>;
-                  })}
+          <details className="span-2 module-form-options" open={Boolean(
+            (module?.initial_justified_absences ?? 0) + (module?.initial_unjustified_absences ?? 0) ||
+            Object.values(module?.initial_absences_by_type ?? {}).some((balance) => balance.justified || balance.unjustified)
+          )}>
+            <summary>{t(lang, "module.initialTitle")}</summary>
+            <fieldset className="initial-absence-fields" aria-describedby="initial-absence-help">
+              <p id="initial-absence-help">{t(lang, "module.initialBody")}</p>
+              {SESSION_TYPES.map((type) => (
+                <div className="form-grid" key={type}>
+                  {(["justified", "unjustified"] as const).map((kind) => (
+                    <div className="field" key={kind}>
+                      <label htmlFor={`module-initial-${type}-${kind}`}>{sessionTypeLabel(type, lang)} · {t(lang, kind === "justified" ? "module.initialJustified" : "module.initialUnjustified")}</label>
+                      <input className="input" id={`module-initial-${type}-${kind}`} type="number" min={0} max={1000} step={1}
+                        value={initialByType[type]?.[kind] ?? 0}
+                        onChange={(event) => setInitialByType((previous) => ({ ...previous, [type]: { justified: previous[type]?.justified ?? 0, unjustified: previous[type]?.unjustified ?? 0, [kind]: Number(event.target.value) } }))} />
+                    </div>
+                  ))}
                 </div>
-              </>
-            )}
-            <p className="initial-absence-fine-print">{t(lang, "module.initialRate")}</p>
-          </fieldset>
-          <div className="field">
-            <label htmlFor="module-total">
-              {t(lang, "module.totalThreshold")}
-            </label>
-            <input
-              className="input"
-              type="number"
-              min={1}
-              max={50}
-              id="module-total"
-              value={values.total_threshold}
-              onChange={(e) => field("total_threshold", e.target.value)}
-              placeholder={t(lang, "module.defaultThreshold", {
-                count: data.student.total_threshold,
-              })}
-            />
-            <small>{t(lang, "module.blankThreshold")}</small>
-          </div>
-          <div className="field">
-            <label htmlFor="module-unjustified">
-              {t(lang, "module.unjustifiedThreshold")}
-            </label>
-            <input
-              className="input"
-              type="number"
-              min={1}
-              max={50}
-              id="module-unjustified"
-              value={values.unjustified_threshold}
-              onChange={(e) => field("unjustified_threshold", e.target.value)}
-              placeholder={t(lang, "module.defaultThreshold", {
-                count: data.student.unjustified_threshold,
-              })}
-            />
-          </div>
+              ))}
+              {((module?.initial_justified_absences ?? 0) + (module?.initial_unjustified_absences ?? 0) > 0) && (
+                <>
+                  <p>{t(lang, "module.unassignedNotice", { count: (module?.initial_justified_absences ?? 0) + (module?.initial_unjustified_absences ?? 0) })}</p>
+                  <div className="form-grid">
+                    {(["justified", "unjustified"] as const).map((kind) => {
+                      const key = kind === "justified" ? "initial_justified_absences" : "initial_unjustified_absences";
+                      return <div className="field" key={kind}>
+                        <label htmlFor={`module-unassigned-${kind}`}>{t(lang, "module.unassigned")} · {t(lang, kind === "justified" ? "module.initialJustified" : "module.initialUnjustified")}</label>
+                        <input className="input" id={`module-unassigned-${kind}`} type="number" min={0} max={1000} step={1} value={values[key]} onChange={(event) => field(key, event.target.value)} />
+                      </div>;
+                    })}
+                  </div>
+                </>
+              )}
+              <p className="initial-absence-fine-print">{t(lang, "module.initialRate")}</p>
+            </fieldset>
+          </details>
+          <details className="span-2 module-form-options">
+            <summary>{lang === "fr" ? "Options du module" : "Module options"}</summary>
+            <div className="form-grid">
+              <div className="field span-2">
+                <label htmlFor="module-professor">
+                  {t(lang, "module.professor")}
+                </label>
+                <input
+                  className="input"
+                  id="module-professor"
+                  value={values.professor}
+                  onChange={(e) => field("professor", e.target.value)}
+                  maxLength={120}
+                  placeholder={t(lang, "module.professorPlaceholder")}
+                />
+              </div>
+              <div className="field span-2">
+                <label htmlFor="module-description">
+                  {t(lang, "module.description")}
+                </label>
+                <textarea
+                  className="input"
+                  id="module-description"
+                  value={values.description}
+                  onChange={(e) => field("description", e.target.value)}
+                  maxLength={4000}
+                  placeholder={t(lang, "module.descriptionPlaceholder")}
+                />
+              </div>
+              <div className="field span-2">
+                <label>{t(lang, "module.color")}</label>
+                <div
+                  className="color-picker"
+                  role="group"
+                  aria-label={t(lang, "module.color")}
+                >
+                  {colors.map((color) => (
+                    <button
+                      className={`color-swatch ${values.color.toUpperCase() === color ? "selected" : ""}`}
+                      type="button"
+                      key={color}
+                      style={{ background: color }}
+                      onClick={() => field("color", color)}
+                      aria-label={t(lang, "module.selectColor", { color })}
+                      aria-pressed={values.color.toUpperCase() === color}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="module-total">
+                  {t(lang, "module.totalThreshold")}
+                </label>
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={50}
+                  id="module-total"
+                  value={values.total_threshold}
+                  onChange={(e) => field("total_threshold", e.target.value)}
+                  placeholder={t(lang, "module.defaultThreshold", {
+                    count: data.student.total_threshold,
+                  })}
+                />
+                <small>{t(lang, "module.blankThreshold")}</small>
+              </div>
+              <div className="field">
+                <label htmlFor="module-unjustified">
+                  {t(lang, "module.unjustifiedThreshold")}
+                </label>
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={50}
+                  id="module-unjustified"
+                  value={values.unjustified_threshold}
+                  onChange={(e) => field("unjustified_threshold", e.target.value)}
+                  placeholder={t(lang, "module.defaultThreshold", {
+                    count: data.student.unjustified_threshold,
+                  })}
+                />
+              </div>
+            </div>
+          </details>
         </div>
         <div className="form-actions">
           <button className="btn btn-ghost" type="button" onClick={onClose}>
@@ -317,11 +329,9 @@ export default function ModulesPage() {
   };
   return (
     <>
-      <div className="page-heading">
+      <div className="page-heading module-list-heading">
         <div>
-          <div className="eyebrow">{t(lang, "module.eyebrow")}</div>
           <h1>{t(lang, "modules")}</h1>
-          <p>{t(lang, "module.subtitle")}</p>
         </div>
         <div className="page-heading-actions">
           <button className="btn btn-primary" onClick={() => setEditing(true)}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatInTimeZone } from "date-fns-tz";
 import {
@@ -44,6 +44,7 @@ export function SessionPanel({
   onMutate,
   onEdit,
 }: SessionPanelProps) {
+  const attendanceFormId = useId();
   const panelRef = useRef<HTMLElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -121,9 +122,9 @@ export function SessionPanel({
       if (event.key !== "Tab") return;
       const elements = Array.from(
         panelRef.current?.querySelectorAll<HTMLElement>(
-          'button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex="0"]',
+          'button:not([disabled]),a[href],summary,input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex="0"]',
         ) ?? [],
-      ).filter((item) => item.offsetParent !== null);
+      ).filter((item) => item.getClientRects().length > 0);
       const first = elements[0],
         last = elements.at(-1);
       if (
@@ -175,8 +176,8 @@ export function SessionPanel({
       });
       setMessage(
         phrase(
-          "Attendance saved. Your module totals have been updated.",
-          "Présence enregistrée. Les totaux du module ont été mis à jour.",
+          "Attendance saved.",
+          "Présence enregistrée.",
         ),
       );
     } catch (cause) {
@@ -229,6 +230,7 @@ export function SessionPanel({
   async function toggleCancellation() {
     setBusy(true);
     setError("");
+    setMessage("");
     try {
       await onMutate("occurrence_save", {
         id: occurrence.id,
@@ -278,7 +280,6 @@ export function SessionPanel({
             className="btn btn-ghost icon-button"
             aria-label={phrase("Close session details", "Fermer les détails")}
             onClick={onClose}
-            autoFocus
           >
             <X size={20} />
           </button>
@@ -338,9 +339,104 @@ export function SessionPanel({
           </div>
         )}
 
+        <section className="session-section session-attendance">
+          <div className="section-title-row">
+            <h3>
+              {attendance
+                ? phrase("Correct attendance", "Corriger la présence")
+                : phrase("Record attendance", "Enregistrer la présence")}
+            </h3>
+            {attendance && (
+              <span className="attendance-recorded">
+                <CheckCircle2 size={14} />
+                {phrase("Recorded", "Enregistrée")}
+              </span>
+            )}
+          </div>
+          {!completed && !liveOccurrence.cancelled ? (
+            <div className="session-info">
+              <Clock3 size={17} />
+              <span>
+                {phrase(
+                  "You can record attendance after this session ends.",
+                  "Vous pourrez renseigner votre présence à la fin de cette séance.",
+                )}
+              </span>
+            </div>
+          ) : liveOccurrence.cancelled ? (
+            <p className="muted">
+              {phrase(
+                "Restore this session before recording attendance.",
+                "Rétablissez la séance avant d’enregistrer la présence.",
+              )}
+            </p>
+          ) : (
+            <form id={attendanceFormId} onSubmit={saveAttendance}>
+              <fieldset className="attendance-options" disabled={busy}>
+                <legend className="sr-only">{phrase("Attendance status", "Statut de présence")}</legend>
+                {(
+                  Object.entries(statusLabels) as [AttendanceStatus, string][]
+                ).map(([value, label]) => (
+                  <label
+                    className={status === value ? `chosen ${value}` : ""}
+                    key={value}
+                  >
+                    <input
+                      type="radio"
+                      name="attendance-status"
+                      value={value}
+                      checked={status === value}
+                      onChange={() => setStatus(value)}
+                    />
+                    <span>
+                      {phrase(
+                        label,
+                        {
+                          present: "Présent",
+                          justified: "Absent · Justifiée",
+                          unjustified: "Absent · Non justifiée",
+                          cancelled: "Annulée",
+                        }[value],
+                      )}
+                    </span>
+                    {status === value && <Check size={15} />}
+                  </label>
+                ))}
+              </fieldset>
+              <label className="field session-note-label">
+                Note{" "}
+                <span className="muted">
+                  {phrase("optional", "facultative")}
+                </span>
+                <textarea
+                  className="input"
+                  rows={2}
+                  maxLength={2000}
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  placeholder={phrase(
+                    "Add context or a justification reference…",
+                    "Ajoutez un contexte ou une référence de justificatif…",
+                  )}
+                />
+              </label>
+              {attendance && (
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  disabled={busy}
+                  onClick={removeAttendance}
+                >
+                  <Trash2 size={16} />
+                  {phrase("Remove record", "Supprimer la présence")}
+                </button>
+              )}
+            </form>
+          )}
+        </section>
         <section className="session-section">
           <div className="section-title-row">
-            <h3>{phrase(`Current attendance · ${liveOccurrence.session_type}`, `Présence actuelle · ${liveOccurrence.session_type === "Lecture" ? "Cours" : liveOccurrence.session_type}`)}</h3>
+            <h3>{phrase("Absence limits", "Limites d’absence")} · {liveOccurrence.session_type === "Lecture" ? phrase("Lecture", "Cours") : liveOccurrence.session_type}</h3>
             <span className={`risk-chip ${stats.risk}`}>
               {stats.risk === "excluded"
                 ? phrase("Excluded", "Exclu")
@@ -378,19 +474,12 @@ export function SessionPanel({
         </section>
 
         {!liveOccurrence.cancelled && (
-          <section className="session-section simulator-section">
-            <div className="section-title-row">
-              <h3>
-                {phrase("Attendance risk simulator", "Simulateur de risque")}
-              </h3>
-              <span className="simulation-label">
-                {phrase("Hypothetical", "Hypothétique")}
-              </span>
-            </div>
+          <details className="session-section simulator-section" open={!completed}>
+            <summary>{phrase("Attendance risk simulator", "Simulateur de risque")}</summary>
             <p className="muted">
               {phrase(
-                "See how one additional absence would affect this session type. This does not change your records.",
-                "Voyez l’effet d’une absence supplémentaire sur ce type de séance. Vos données ne changent pas.",
+                "See how one additional absence would affect this session type. Try a hypothetical absence.",
+                "Voyez l’effet d’une absence supplémentaire sur ce type de séance. Essayez une absence hypothétique.",
               )}
             </p>
             <div
@@ -473,139 +562,12 @@ export function SessionPanel({
                 <strong>{simulation.justified}</strong>
               </span>
             </div>
-            <p className="session-fine-print">
-              {phrase(
-                "This is an attendance risk estimate. Attend your scheduled classes and check your institution’s official records.",
-                "Ceci est une estimation du risque. Assistez à vos séances et consultez les relevés officiels de votre établissement.",
-              )}
-            </p>
-          </section>
+          </details>
         )}
 
-        <section className="session-section">
-          <div className="section-title-row">
-            <h3>
-              {attendance
-                ? phrase("Correct attendance", "Corriger la présence")
-                : phrase("Record attendance", "Enregistrer la présence")}
-            </h3>
-            {attendance && (
-              <span className="attendance-recorded">
-                <CheckCircle2 size={14} />
-                {phrase("Recorded", "Enregistrée")}
-              </span>
-            )}
-          </div>
-          {!completed ? (
-            <div className="session-info">
-              <Clock3 size={17} />
-              <span>
-                {phrase(
-                  "Attendance can be recorded after the session ends. Future sessions are never counted as absences.",
-                  "La présence peut être enregistrée après la fin de la séance. Les séances futures ne sont jamais comptées comme absences.",
-                )}
-              </span>
-            </div>
-          ) : liveOccurrence.cancelled ? (
-            <p className="muted">
-              {phrase(
-                "Restore this session before recording attendance.",
-                "Rétablissez la séance avant d’enregistrer la présence.",
-              )}
-            </p>
-          ) : (
-            <form onSubmit={saveAttendance}>
-              <fieldset className="attendance-options" disabled={busy}>
-                <legend className="sr-only">Attendance status</legend>
-                {(
-                  Object.entries(statusLabels) as [AttendanceStatus, string][]
-                ).map(([value, label]) => (
-                  <label
-                    className={status === value ? `chosen ${value}` : ""}
-                    key={value}
-                  >
-                    <input
-                      type="radio"
-                      name="attendance-status"
-                      value={value}
-                      checked={status === value}
-                      onChange={() => setStatus(value)}
-                    />
-                    <span>
-                      {phrase(
-                        label,
-                        {
-                          present: "Présent",
-                          justified: "Absent · Justifiée",
-                          unjustified: "Absent · Non justifiée",
-                          cancelled: "Annulée",
-                        }[value],
-                      )}
-                    </span>
-                    {status === value && <Check size={15} />}
-                  </label>
-                ))}
-              </fieldset>
-              <label className="field session-note-label">
-                Note{" "}
-                <span className="muted">
-                  {phrase("optional", "facultative")}
-                </span>
-                <textarea
-                  className="input"
-                  rows={3}
-                  maxLength={2000}
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  placeholder={phrase(
-                    "Add context or a justification reference…",
-                    "Ajoutez un contexte ou une référence de justificatif…",
-                  )}
-                />
-              </label>
-              <div className="session-actions">
-                <button
-                  className="btn btn-primary"
-                  type="submit"
-                  disabled={busy}
-                >
-                  {busy
-                    ? phrase("Saving…", "Enregistrement…")
-                    : attendance
-                      ? phrase("Save correction", "Enregistrer la correction")
-                      : phrase("Save attendance", "Enregistrer la présence")}
-                </button>
-                {attendance && (
-                  <button
-                    className="btn btn-ghost"
-                    type="button"
-                    disabled={busy}
-                    onClick={removeAttendance}
-                  >
-                    <Trash2 size={16} />
-                    {phrase("Remove record", "Supprimer la présence")}
-                  </button>
-                )}
-              </div>
-            </form>
-          )}
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
-          {message && (
-            <p className="form-success" role="status">
-              {message}
-            </p>
-          )}
-        </section>
         {auditEntries.length > 0 && (
-          <section className="session-section">
-            <h3>
-              <FileClock size={17} />
-              {phrase("Change history", "Historique des modifications")}
-            </h3>
+          <details className="session-section session-change-history">
+            <summary><FileClock size={17} aria-hidden="true" />{phrase("Change history", "Historique des modifications")}</summary>
             <ul className="session-audit-list">
               {auditEntries.map((entry) => (
                 <li key={entry.id}>
@@ -621,30 +583,51 @@ export function SessionPanel({
                 </li>
               ))}
             </ul>
-          </section>
+          </details>
         )}
         </div>
         <footer className="session-panel-footer">
-          {onEdit && (
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          {message && (
+            <p className="form-success" role="status">
+              {message}
+            </p>
+          )}
+          <div className="session-footer-actions">
+            {completed && !liveOccurrence.cancelled && (
+              <button className="btn btn-primary session-save" type="submit" form={attendanceFormId} disabled={busy}>
+                {busy
+                  ? phrase("Saving…", "Enregistrement…")
+                  : attendance
+                    ? phrase("Save correction", "Enregistrer la correction")
+                    : phrase("Save attendance", "Enregistrer la présence")}
+              </button>
+            )}
+            {onEdit && (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => onEdit(liveOccurrence)}
+              >
+                <Pencil size={16} />
+                {phrase("Edit session", "Modifier la séance")}
+              </button>
+            )}
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={() => onEdit(liveOccurrence)}
+              disabled={busy}
+              onClick={toggleCancellation}
             >
-              <Pencil size={16} />
-              {phrase("Edit session", "Modifier la séance")}
+              {liveOccurrence.cancelled
+                ? phrase("Restore session", "Rétablir la séance")
+                : phrase("Cancel session", "Annuler la séance")}
             </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-ghost"
-            disabled={busy}
-            onClick={toggleCancellation}
-          >
-            {liveOccurrence.cancelled
-              ? phrase("Restore session", "Rétablir la séance")
-              : phrase("Cancel session", "Annuler la séance")}
-          </button>
+          </div>
         </footer>
       </section>
     </div>,

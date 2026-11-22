@@ -685,6 +685,7 @@
   border: 0;
 }
 .attendance-options label {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -697,8 +698,12 @@
 }
 .attendance-options label > input {
   position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   opacity: 0;
-  pointer-events: none;
+  cursor: pointer;
 }
 .attendance-options label:focus-within {
   outline: 2px solid var(--primary);
@@ -740,17 +745,6 @@
   resize: vertical;
   margin-top: 0.2rem;
 }
-.session-actions {
-  display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  margin-top: 1.25rem;
-}
-.session-actions .btn {
-  font-size: 0.8125rem;
-  min-height: 40px;
-}
 .session-info {
   display: flex;
   align-items: flex-start;
@@ -770,14 +764,27 @@
 .session-panel-footer {
   display: flex;
   flex-shrink: 0;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 0.5rem;
   padding: 1rem 1.75rem max(1rem, env(safe-area-inset-bottom));
   border-top: 1px solid var(--border, #253047);
 }
-.session-panel-footer .btn {
+.session-panel-footer .form-success,
+.session-panel-footer .form-error {
+  margin: 0;
+}
+.session-footer-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.session-footer-actions .btn {
+  min-height: 44px;
   font-size: 0.8125rem;
+}
+.session-save {
+  margin-inline-end: auto;
 }
 .session-audit-list {
   list-style: none;
@@ -1079,5 +1086,50 @@
       transform: translateY(0);
       opacity: 1;
     }
+  }
+}
+
+.session-attendance {
+  padding-top: 1rem;
+}
+.session-section > summary {
+  cursor: pointer;
+  padding-block: 5px;
+  font-weight: 600;
+}
+.session-section > summary > svg {
+  display: inline-block;
+  vertical-align: middle;
+  margin-inline: 4px 8px;
+}
+.session-section[open] > summary {
+  margin-bottom: 12px;
+}
+.attendance-options label {
+  min-height: 46px;
+  color: var(--text);
+}
+.timetable-no-events {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 14px;
+}
+.timetable-no-events p {
+  margin: 0;
+}
+@media (max-width: 480px) {
+  .session-save {
+    flex: 1 1 auto;
+    margin-inline-end: 0;
+  }
+  .session-footer-actions {
+    gap: 0.25rem;
+  }
+  .timetable-heading {
+    display: grid;
+  }
+  .timetable-heading .btn {
+    margin-top: 0;
   }
 }

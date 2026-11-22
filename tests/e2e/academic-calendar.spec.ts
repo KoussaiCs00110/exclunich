@@ -59,10 +59,10 @@ test("academic breaks apply to different students without sharing their classes"
         await expect(page.locator('.fc-col-header-cell[data-date="2026-12-03"] .calendar-period-badge')).toHaveText("Test 1");
         await expect(page.locator('.fc-col-header-cell[data-date="2026-12-04"] .calendar-period-badge')).toHaveCount(0);
         await expect(page.locator(".fc-timegrid-col.calendar-period-day")).toHaveCount(5);
+        await page.locator(".fc-next-button").click();
       } else {
-        await expect(page.locator(".fc-list-empty")).toContainText("Test 1");
+        await page.locator(".fc-list-empty").getByRole("button", { name: "Go to next session" }).click();
       }
-      await page.locator(".fc-next-button").click();
       await expect(page.locator(".fc-event")).toHaveCount(1);
       await expect(page.locator(".timetable-period-notice")).toHaveCount(0);
       if (number === 1) {

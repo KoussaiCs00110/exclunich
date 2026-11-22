@@ -65,7 +65,7 @@ for (const field of ["semester", "academic_year"] as const) {
       expect(archived.occurrences).toEqual(before.occurrences);
       expect(archived.attendance[0].note).toBe("Retained previous-term attendance");
       await page.goto("/timetable");
-      await expect(page.getByRole("heading", { name: "Make room for your semester" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Create a module" })).toBeVisible();
       await page.goto("/modules");
       await page.getByRole("button", { name: "Archived", exact: true }).click();
       await expect(page.getByRole("heading", { name: "Previous Term Networks", exact: true })).toBeVisible();

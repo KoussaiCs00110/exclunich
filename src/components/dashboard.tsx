@@ -6,10 +6,9 @@ import {
   AlertTriangle,
   BookOpen,
   CalendarDays,
-  Check,
   CheckCircle2,
   ClipboardCheck,
-  Clock3,
+  ChevronRight,
   Info,
   MapPin,
   Plus,
@@ -18,17 +17,17 @@ import {
   ShieldX,
 } from "lucide-react";
 import {
-  getSessionStats,
+  getPendingSessions,
   getOverview,
   getUpcomingSessions,
   simulateAbsence,
 } from "@/lib/attendance";
-import { formatInZone } from "@/lib/timezone";
+import { formatInZone, localDateKey } from "@/lib/timezone";
 import { t, sessionTypeLabel, semesterLabel } from "@/lib/i18n";
 import type { Module, AttendanceStats, SessionStats, Occurrence } from "@/lib/types";
 import { useWorkspace } from "./workspace";
 import { SessionPanel } from "./session-panel";
-import { Analytics } from "./analytics";
+
 export function RiskBadge({ stats }: { stats: AttendanceStats }) {
   const { data } = useWorkspace();
   const lang = data.student.language;
@@ -164,436 +163,187 @@ export function RiskRow({
 export default function Dashboard() {
   const { data, mutate } = useWorkspace();
   const lang = data.student.language;
-  const locale = lang === "fr" ? "fr-DZ" : "en-GB";
-  const [selected, setSelected] = useState<Occurrence | null>(null);
-  const overview = getOverview(data);
-  const upcoming = getUpcomingSessions(data);
-  const firstName = data.student.full_name.split(" ")[0];
+  const fr = lang === "fr";
   const zone = data.student.timezone;
-  const rate = overview.attendanceRate;
-  const stroke = rate === null ? 0 : (rate / 100) * 314.16;
-  const metrics = [
-    {
-      label: t(lang, "attendanceRate"),
-      value: rate === null ? "—" : `${rate}%`,
-      icon: Activity,
-      foot: t(lang, "dashboard.presentRecorded", {
-        present: overview.present,
-        recorded: overview.recorded,
-      }),
-      color: "var(--primary)",
-    },
-    {
-      label: t(lang, "totalAbsences"),
-      value: overview.totalAbsences,
-      icon: CalendarDays,
-      foot: t(lang, "dashboard.absenceBreakdown", {
-        justified: overview.justified,
-        unjustified: overview.unjustified,
-      }),
-      color: "var(--cyan)",
-    },
-    {
-      label: t(lang, "dashboard.modulesAtRisk"),
-      value: overview.atRisk,
-      icon: ShieldAlert,
-      foot: t(
-        lang,
-        overview.atRisk
-          ? "dashboard.riskAttention"
-          : "dashboard.withinWarnings",
-      ),
-      color: "var(--amber)",
-    },
-    {
-      label: t(lang, "dashboard.scheduled"),
-      value: overview.scheduled,
-      icon: Clock3,
-      foot: t(lang, "dashboard.sessionsToMark", { count: overview.unrecorded }),
-      color: "var(--primary)",
-    },
-  ];
+  const locale = fr ? "fr-DZ" : "en-GB";
+  const [selected, setSelected] = useState<Occurrence | null>(null);
+  const [showAllLimits, setShowAllLimits] = useState(false);
+  const now = Date.now();
+  const today = localDateKey(now, zone);
+  const overview = getOverview(data, now);
+  const modules = new Map(overview.moduleStats.map(({ module }) => [module.id, module]));
+  const pending = getPendingSessions(data, now).filter((session) => modules.has(session.module_id));
+  const upcoming = getUpcomingSessions(data, 3, now);
+  const scheduledTypes = new Set(data.sessions.map((session) => `${session.module_id}:${session.session_type}`));
+  const limits = overview.sessionStats.filter(({ module, stats }) =>
+    stats.scheduled > 0 || stats.initialAbsences > 0 || scheduledTypes.has(`${module.id}:${stats.sessionType}`),
+  );
+  const flagged = limits.filter(({ stats }) => stats.risk !== "safe");
+  const visibleLimits = showAllLimits ? limits : flagged.slice(0, 4);
+  const byType = new Map(limits.map(({ module, stats }) => [`${module.id}:${stats.sessionType}`, stats]));
+
+  const renderSession = (occurrence: Occurrence, toRecord = false) => {
+    const module = modules.get(occurrence.module_id)!;
+    const stats = byType.get(`${module.id}:${occurrence.session_type}`);
+    const projection = stats && !toRecord ? simulateAbsence(stats, "unjustified") : null;
+    const date = localDateKey(occurrence.starts_at, zone) === today
+      ? fr ? "Aujourd’hui" : "Today"
+      : formatInZone(occurrence.starts_at, "d MMM", zone, locale);
+    return (
+      <button
+        type="button"
+        key={occurrence.id}
+        className={`task-session ${toRecord ? "task-session-pending" : "upcoming-item"}`}
+        onClick={() => setSelected(occurrence)}
+      >
+        <span className="task-session-time">
+          <small>{date}</small>
+          <strong>{formatInZone(occurrence.starts_at, "HH:mm", zone)}</strong>
+        </span>
+        <span className="task-session-class">
+          <strong>{module.name}</strong>
+          <span className="task-session-meta">
+            {sessionTypeLabel(occurrence.session_type, lang)}
+            {occurrence.classroom && <span><MapPin size={12} aria-hidden="true" />{occurrence.classroom}</span>}
+          </span>
+          {projection && projection.risk !== "safe" && (
+            <span className={`badge badge-${projection.risk}`}>
+              {t(lang, projection.alreadyExcluded ? "alreadyExcluded" : projection.risk === "excluded" ? "dashboard.exclusionIfMissed" : "dashboard.warningIfMissed")}
+            </span>
+          )}
+        </span>
+        {toRecord && <span className="task-session-action">{fr ? "Renseigner" : "Record"}</span>}
+        <ChevronRight size={17} aria-hidden="true" />
+      </button>
+    );
+  };
+
   return (
-    <>
-      <div className="page-heading">
+    <div className="student-dashboard">
+      <div className="page-heading task-heading">
         <div>
-          <div className="eyebrow">{t(lang, "dashboard.eyebrow")}</div>
-          <h1>
-            {t(lang, "dashboard.welcome", { name: firstName })}
-            <span className="text-primary">.</span>
-          </h1>
-          <p>{t(lang, "dashboard.subtitle")}</p>
+          <h1>{t(lang, "dashboard.welcome", { name: data.student.full_name.trim().split(/\s+/)[0] })}</h1>
+          <p>{formatInZone(now, "EEEE d MMMM", zone, locale)} · {semesterLabel(data.student.semester, lang)}</p>
         </div>
-        <div className="page-heading-actions">
-          <Link href="/history?pending=1" className="btn btn-secondary">
-            <ClipboardCheck size={16} />
-            {t(lang, "dashboard.record")}
-          </Link>
-          <Link href="/timetable?add=1" className="btn btn-primary">
-            <Plus size={16} />
-            {t(lang, "addSession")}
-          </Link>
-        </div>
+        {overview.totalModules > 0 && (
+          <div className="page-heading-actions">
+            <Link href="/timetable?add=1" className="btn btn-secondary">
+              <Plus size={16} />{t(lang, "addSession")}
+            </Link>
+          </div>
+        )}
       </div>
-      {!overview.totalModules && (
-        <div className="card onboarding">
+
+      {overview.totalModules === 0 ? (
+        <section className="card semester-setup" aria-labelledby="semester-setup-title">
+          <span className="task-icon"><BookOpen size={23} aria-hidden="true" /></span>
           <div>
-            <h2>{t(lang, "dashboard.onboardingTitle")}</h2>
-            <p>{t(lang, "dashboard.onboardingBody")}</p>
-            <div className="onboarding-steps">
-              <span className="step-chip done">
-                <Check size={12} />
-                {t(lang, "dashboard.workspaceCreated")}
-              </span>
-              <span className="step-chip">
-                <BookOpen size={12} />
-                {t(lang, "dashboard.addModules")}
-              </span>
-              <span className="step-chip">
-                <CalendarDays size={12} />
-                {t(lang, "dashboard.buildTimetable")}
-              </span>
+            <h2 id="semester-setup-title">{fr ? "Configurez votre semestre" : "Set up your semester"}</h2>
+            <p>{fr ? "Ajoutez un module, puis planifiez vos cours, TD et TP." : "Add a module, then schedule its lectures, TDs, and TPs."}</p>
+            <div className="row wrap">
+              <Link href="/modules?add=1" className="btn btn-primary"><Plus size={16} />{t(lang, "dashboard.firstModule")}</Link>
+              <Link href="/timetable?import=1" className="btn btn-ghost">{fr ? "Importer un emploi du temps" : "Import a timetable"}<ChevronRight size={16} aria-hidden="true" /></Link>
             </div>
           </div>
-          <Link className="btn btn-primary" href="/modules?add=1">
-            <Plus size={16} />
-            {t(lang, "dashboard.firstModule")}
-          </Link>
-        </div>
-      )}
-      <div className="stats-grid">
-        {metrics.map(({ label, value, icon: Icon, foot, color }) => (
-          <div className="card stat-card" key={label}>
-            <div className="stat-top">
-              <span>{label}</span>
-              <span
-                className="stat-icon"
-                style={{
-                  color,
-                  background: `color-mix(in srgb, ${color} 10%, transparent)`,
-                }}
-              >
-                <Icon size={17} />
-              </span>
-            </div>
-            <div className="stat-value">{value}</div>
-            <div className="stat-foot">
-              {label === t(lang, "dashboard.modulesAtRisk") &&
-              !overview.atRisk ? (
-                <CheckCircle2 size={12} className="text-green" />
-              ) : null}
-              {foot}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="secondary-metrics">
-        <span>
-          <BookOpen size={14} />
-          <b>{overview.totalModules}</b> {t(lang, "dashboard.activeModules")}
-        </span>
-        <span>
-          <span className="legend-dot" style={{ background: "var(--amber)" }} />
-          <b>{overview.justified}</b> {t(lang, "dashboard.justifiedAbsences")}
-        </span>
-        <span>
-          <span className="legend-dot" style={{ background: "var(--red)" }} />
-          <b>{overview.unjustified}</b>{" "}
-          {t(lang, "dashboard.unjustifiedAbsences")}
-        </span>
-        <span>
-          <ShieldX size={14} className={overview.excluded ? "text-red" : ""} />
-          <b>{overview.excluded}</b> {t(lang, "dashboard.excludedModules")}
-        </span>
-      </div>
-      <div className="dashboard-main">
-        <div className="dashboard-column">
-          <section className="card">
-            <div className="card-header">
-              <div>
-                <h2>{t(lang, "dashboard.riskMonitor")}</h2>
-                <p>{t(lang, "dashboard.riskSubtitle")}</p>
-              </div>
-              <span className="badge">
-                {t(lang, "dashboard.modulesCount", {
-                  count: overview.totalModules,
-                })}
-              </span>
-            </div>
-            {overview.totalModules ? (
-              <div className="risk-list">
-                {overview.sessionStats.map(({ module, stats }) => (
-                  <RiskRow key={`${module.id}:${stats.sessionType}`} module={module} stats={stats} />
-                ))}
-              </div>
-            ) : (
-              <div className="empty empty-small">
-                <ShieldCheck size={27} />
-                <h3>{t(lang, "dashboard.riskEmpty")}</h3>
-                <p>{t(lang, "dashboard.riskEmptyBody")}</p>
-              </div>
-            )}
-            {overview.unassignedInitialAbsences > 0 && <p className="help-caption">{t(lang, "module.unassignedNotice", { count: overview.unassignedInitialAbsences })}</p>}
-            <div className="card-footer">
-              <Link href="/modules" className="text-link">
-                {t(lang, "dashboard.allModules")}
-              </Link>
-            </div>
-          </section>
-          <section className="card">
-            <div className="card-header">
-              <div>
-                <h2>{t(lang, "dashboard.insights")}</h2>
-                <p>{t(lang, "dashboard.insightsBody")}</p>
-              </div>
-              <Link href="/statistics" className="text-link">
-                {t(lang, "dashboard.allStatistics")}
-              </Link>
-            </div>
-            <Analytics data={data} compact />
-          </section>
-          <div className="notice notice-info">
-            <Info size={18} />
-            <div>
-              <strong>{t(lang, "dashboard.rulesTitle")}</strong>
-              <p>
-                {t(lang, "dashboard.rulesBody", {
-                  unjustified: data.student.unjustified_threshold,
-                  total: data.student.total_threshold,
-                })}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="dashboard-column secondary">
-          <section className="card">
-            <div className="card-header">
-              <div>
-                <h2>{t(lang, "dashboard.overview")}</h2>
-                <p>{t(lang, "dashboard.overviewBody")}</p>
-              </div>
-              <span className="badge badge-info">
-                {semesterLabel(data.student.semester, lang)}
-              </span>
-            </div>
-            <div className="attendance-card-inner">
-              <div className="attendance-ring">
-                <svg viewBox="0 0 120 120" aria-hidden="true">
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="50"
-                    fill="none"
-                    stroke="var(--surface-3)"
-                    strokeWidth="9"
-                  />
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="50"
-                    fill="none"
-                    stroke="var(--primary)"
-                    strokeWidth="9"
-                    strokeLinecap="round"
-                    strokeDasharray={`${stroke} 314.16`}
-                  />
-                </svg>
-                <div className="attendance-ring-value">
-                  <strong>{rate === null ? "—" : `${rate}%`}</strong>
-                  <small>{t(lang, "attendanceRate")}</small>
+        </section>
+      ) : (
+        <>
+          <div className="dashboard-tasks">
+            <section className="card task-card" aria-labelledby="attendance-task-title">
+              <div className="task-card-header">
+                <span className="task-icon"><ClipboardCheck size={20} aria-hidden="true" /></span>
+                <div>
+                  <h2 id="attendance-task-title">{t(lang, "dashboard.record")}</h2>
+                  {pending.length > 0 && <p>{pending.length === 1
+                  ? fr ? "1 séance à renseigner" : "1 session to record"
+                  : t(lang, "dashboard.sessionsToMark", { count: pending.length })}</p>}
                 </div>
               </div>
-              <div className="attendance-legend">
-                {[
-                  [t(lang, "present"), overview.present, "var(--primary)"],
-                  [
-                    t(lang, "dashboard.justifiedLabel"),
-                    overview.justified,
-                    "var(--amber)",
-                  ],
-                  [
-                    t(lang, "dashboard.unjustifiedLabel"),
-                    overview.unjustified,
-                    "var(--red)",
-                  ],
-                ].map(([label, value, color]) => (
-                  <div className="legend-row" key={label}>
-                    <span
-                      className="legend-dot"
-                      style={{ background: String(color) }}
-                    />
-                    <span>{label}</span>
-                    <b>{value}</b>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <p className="help-caption">
-              {t(lang, "dashboard.recordedBasis", { count: overview.recorded })}{" "}
-              {overview.unrecorded > 0
-                ? t(lang, "dashboard.pendingCount", {
-                    count: overview.unrecorded,
-                  })
-                : t(lang, "dashboard.unmarkedExplanation")}
-            </p>
-            {overview.initialAbsences > 0 && <p className="help-caption">{t(lang, "module.initialSummary", { count: overview.initialAbsences })} {t(lang, "module.initialRate")}</p>}
-          </section>
-          <section className="card">
-            <div className="card-header">
-              <div>
-                <h2>{t(lang, "dashboard.upNext")}</h2>
-                <p>{t(lang, "dashboard.upNextBody")}</p>
-              </div>
-              <CalendarDays size={18} className="muted" />
-            </div>
-            {upcoming.length ? (
-              <div className="upcoming-list">
-                {upcoming.map((occurrence) => {
-                  const module = data.modules.find(
-                    (m) => m.id === occurrence.module_id,
-                  )!;
-                  const risk = simulateAbsence(
-                    getSessionStats(module, data, occurrence.session_type),
-                    "unjustified",
-                  );
-                  return (
-                    <button
-                      key={occurrence.id}
-                      className="upcoming-item"
-                      onClick={() => setSelected(occurrence)}
-                    >
-                      <div className="session-time">
-                        <span className="session-day">
-                          {formatInZone(
-                            occurrence.starts_at,
-                            "EEE dd",
-                            zone,
-                            locale,
-                          )}
-                        </span>
-                        <strong>
-                          {formatInZone(occurrence.starts_at, "HH:mm", zone)}
-                        </strong>
-                        {formatInZone(occurrence.ends_at, "HH:mm", zone)}
-                      </div>
-                      <div className="upcoming-details">
-                        <span className="module-name">{module.name}</span>
-                        <div className="upcoming-meta">
-                          <span
-                            className={`badge badge-${occurrence.session_type}`}
-                          >
-                            {sessionTypeLabel(occurrence.session_type, lang)}
-                          </span>
-                          <MapPin size={10} />
-                          {occurrence.classroom ||
-                            t(lang, "dashboard.roomUnset")}
-                        </div>
-                        <span className={`badge badge-${risk.risk}`}>
-                          {t(
-                            lang,
-                            risk.alreadyExcluded
-                              ? "alreadyExcluded"
-                              : risk.risk === "excluded"
-                                ? "dashboard.exclusionIfMissed"
-                                : risk.risk === "warning"
-                                  ? "dashboard.warningIfMissed"
-                                  : "dashboard.withinIfMissed",
-                          )}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="empty empty-small">
-                <CalendarDays size={27} />
-                <h3>{t(lang, "dashboard.noUpcoming")}</h3>
-                <p>{t(lang, "dashboard.noUpcomingBody")}</p>
-                <Link href="/timetable" className="btn btn-sm">
-                  {t(lang, "dashboard.openTimetable")}
-                </Link>
-              </div>
-            )}
-            <div className="card-footer">
-              <Link href="/timetable" className="text-link">
-                {t(lang, "dashboard.myTimetable")}
-              </Link>
-            </div>
-          </section>
-          <section className="card">
-            <div className="card-header">
-              <div>
-                <h2>{t(lang, "dashboard.alerts")}</h2>
-                <p>{t(lang, "dashboard.alertsBody")}</p>
-              </div>
-              <span className="badge">
-                {overview.atRisk + overview.excluded}
-              </span>
-            </div>
-            <div style={{ padding: "0 20px 20px", display: "grid", gap: 12 }}>
-              {overview.sessionStats
-                .filter(({ stats }) => stats.risk !== "safe")
-                .slice(0, 3)
-                .map(({ module, stats }) => (
-                  <Link
-                    href={`/modules/${module.id}`}
-                    className={`notice ${stats.risk === "excluded" ? "notice-danger" : ""}`}
-                    key={`${module.id}:${stats.sessionType}`}
-                  >
-                    <AlertTriangle size={17} />
-                    <div>
-                      <strong>{module.name} · {sessionTypeLabel(stats.sessionType, lang)}</strong>
-                      <p>
-                        {stats.risk === "excluded"
-                          ? t(lang, "dashboard.exclusionReached")
-                          : stats.critical
-                            ? t(lang, "dashboard.criticalAlert")
-                            : t(lang, "dashboard.warningAlert", {
-                                unjustified: stats.unjustified,
-                                total: stats.totalAbsences,
-                              })}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              {overview.atRisk + overview.excluded === 0 && (
-                <div className="notice notice-info">
-                  <ShieldCheck size={18} />
-                  <div>
-                    <strong>
-                      {t(
-                        lang,
-                        overview.totalModules
-                          ? "dashboard.withinLimits"
-                          : "dashboard.freshStart",
-                      )}
-                    </strong>
-                    <p>
-                      {t(
-                        lang,
-                        overview.totalModules
-                          ? "dashboard.noWarnings"
-                          : "dashboard.alertsEmpty",
-                      )}
-                    </p>
-                  </div>
-                </div>
+              {pending.length ? (
+                <div className="task-sessions">{pending.slice(0, 3).map((item) => renderSession(item, true))}</div>
+              ) : (
+                <p className="task-empty" role="status"><CheckCircle2 size={17} aria-hidden="true" />{fr ? "Vos séances terminées sont à jour." : "You’re all caught up"}</p>
               )}
-            </div>
-          </section>
-          <div className="quick-actions">
-            <Link href="/history" className="quick-action">
-              <ClipboardCheck size={18} />
-              {t(lang, "history")}
-            </Link>
-            <Link href="/settings" className="quick-action">
-              <ShieldCheck size={18} />
-              {t(lang, "dashboard.preferences")}
-            </Link>
+              <Link className="task-card-link" href={pending.length ? "/history?pending=1" : "/history"}>
+                {pending.length ? fr ? "Voir toutes les séances à renseigner" : "View all sessions to record" : t(lang, "history")}
+                <ChevronRight size={16} aria-hidden="true" />
+              </Link>
+            </section>
+
+            <section className="card task-card" aria-labelledby="upcoming-task-title">
+              <div className="task-card-header">
+                <span className="task-icon"><CalendarDays size={20} aria-hidden="true" /></span>
+                <h2 id="upcoming-task-title">{t(lang, "dashboard.upNext")}</h2>
+              </div>
+              {upcoming.length ? (
+                <div className="task-sessions">{upcoming.map((item) => renderSession(item))}</div>
+              ) : (
+                <p className="task-empty">{fr ? "Aucune séance à venir." : "No upcoming classes scheduled."}</p>
+              )}
+              <Link className="task-card-link" href="/timetable">
+                {t(lang, "dashboard.openTimetable")}<ChevronRight size={16} aria-hidden="true" />
+              </Link>
+            </section>
           </div>
-        </div>
-      </div>
+
+          <section className="card task-card dashboard-limits" aria-labelledby="absence-limits-title">
+            <div className="task-card-header">
+              <span className="task-icon"><ShieldAlert size={20} aria-hidden="true" /></span>
+              <div>
+                <h2 id="absence-limits-title">{fr ? "Limites d’absence" : "Absence limits"}</h2>
+                <p>{fr ? "Calculées séparément pour les cours, TD et TP." : "Tracked separately for lectures, TDs, and TPs."}</p>
+              </div>
+            </div>
+            {!flagged.length && !showAllLimits && (
+              <p className="task-empty"><ShieldCheck size={17} aria-hidden="true" />{fr ? "Aucun type de séance n’a atteint un seuil d’alerte." : "No session types have reached a warning threshold."}</p>
+            )}
+            <div id="dashboard-limit-list">
+              {visibleLimits.map(({ module, stats }) => (
+                <Link key={`${module.id}:${stats.sessionType}`} href={`/modules/${module.id}`} className="dashboard-limit-row">
+                  <ModuleIcon module={module} />
+                  <span className="dashboard-limit-label">
+                    <strong>{module.name} · {sessionTypeLabel(stats.sessionType, lang)}</strong>
+                    <small>
+                      {stats.totalAbsences}/{stats.thresholds.total} {t(lang, "risk.totalAbsences")}
+                      {" · "}
+                      {stats.unjustified}/{stats.thresholds.unjustified} {t(lang, "risk.unjustified")}
+                    </small>
+                    {stats.critical && <small>{t(lang, "dashboard.criticalAlert")}</small>}
+                  </span>
+                  <RiskBadge stats={stats} />
+                  <ChevronRight size={16} aria-hidden="true" />
+                </Link>
+              ))}
+            </div>
+            {overview.unassignedInitialAbsences > 0 && (
+              <Link className="dashboard-balance-notice" href="/modules">
+                <Info size={16} aria-hidden="true" />{fr ? "Certaines absences antérieures sont à affecter à un type de séance." : "Assign earlier absences to a session type so they count toward its limit."}
+              </Link>
+            )}
+            {limits.length > flagged.slice(0, 4).length && (
+              <button type="button" className="task-card-link" aria-expanded={showAllLimits} aria-controls="dashboard-limit-list" onClick={() => setShowAllLimits(!showAllLimits)}>
+                {showAllLimits ? fr ? "Masquer les détails" : "Show less" : fr ? "Voir toutes les limites" : "View all limits"}
+                <ChevronRight size={16} aria-hidden="true" />
+              </button>
+            )}
+          </section>
+
+          <section className="card task-card dashboard-summary" aria-labelledby="attendance-summary-title">
+            <div className="task-card-header">
+              <span className="task-icon"><Activity size={20} aria-hidden="true" /></span>
+              <div><h2 id="attendance-summary-title">{t(lang, "dashboard.overview")}</h2></div>
+            </div>
+            <dl>
+              <div><dt>{t(lang, "attendanceRate")}</dt><dd>{overview.attendanceRate === null ? "—" : `${overview.attendanceRate}%`}</dd><small>{t(lang, "dashboard.presentRecorded", { present: overview.present, recorded: overview.recorded })}</small></div>
+              <div><dt>{t(lang, "totalAbsences")}</dt><dd>{overview.totalAbsences}</dd><small>{t(lang, "dashboard.absenceBreakdown", { justified: overview.justified, unjustified: overview.unjustified })}</small></div>
+              <div><dt>{t(lang, "dashboard.scheduled")}</dt><dd>{overview.scheduled}</dd><small>{t(lang, "dashboard.modulesCount", { count: overview.totalModules })}</small></div>
+            </dl>
+            <Link className="task-card-link" href="/statistics">
+              {t(lang, "dashboard.allStatistics")}<ChevronRight size={16} aria-hidden="true" />
+            </Link>
+          </section>
+        </>
+      )}
       {selected && (
         <SessionPanel
           data={data}
@@ -602,6 +352,6 @@ export default function Dashboard() {
           onMutate={mutate}
         />
       )}
-    </>
+    </div>
   );
 }

@@ -12,12 +12,11 @@ import {
   LayoutDashboard,
   CalendarDays,
   BookOpen,
-  History,
+  ClipboardCheck,
   ChartNoAxesCombined,
   Bell,
   Settings,
   Sun,
-  Moon,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -56,7 +55,7 @@ const links = [
     href: "/history",
     label: "Attendance History",
     key: "history",
-    icon: History,
+    icon: ClipboardCheck,
   },
   {
     href: "/statistics",
@@ -161,6 +160,7 @@ export function Workspace({
   return (
     <Context.Provider value={{ data, refresh, mutate }}>
       <div className={`app ${collapsed ? "sidebar-collapsed" : ""}`}>
+        <a className="workspace-skip" href="#workspace-content">{lang === "fr" ? "Aller au contenu" : "Skip to content"}</a>
         <aside className="sidebar">
           <Link href="/" aria-label={t(lang, "workspace.home")}>
             <Logo />
@@ -259,7 +259,7 @@ export function Workspace({
                 )}
               </span>
               <button
-                className="btn btn-ghost btn-icon"
+                className="btn btn-ghost btn-icon topbar-refresh"
                 disabled={refreshing}
                 aria-label={t(lang, "workspace.refresh")}
                 onClick={() => refresh().catch((e) => toast.error(e.message))}
@@ -293,7 +293,7 @@ export function Workspace({
               </Link>
             </div>
           </header>
-          <main className="content">
+          <main id="workspace-content" className="content" tabIndex={-1}>
             {demo && (
               <div
                 className="notice notice-info"
@@ -329,7 +329,7 @@ export function Workspace({
           className="mobile-nav"
           aria-label={t(lang, "workspace.mobileNavigation")}
         >
-          {[links[0], links[1], links[2], links[4], links[6]].map(
+          {[links[0], links[1], links[3], links[2], links[6]].map(
             ({ href, key, icon: Icon }) => (
               <Link
                 href={href}

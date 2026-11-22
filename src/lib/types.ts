@@ -28,6 +28,8 @@ export interface Student extends Settings {
   created_at: string;
 }
 
+export type InitialAbsencesByType = Partial<Record<SessionType, { justified: number; unjustified: number }>>;
+
 export interface Module {
   id: string;
   student_id?: string;
@@ -43,6 +45,7 @@ export interface Module {
   /** Personal absence balances from before tracking; absent in legacy snapshots. */
   initial_justified_absences?: number;
   initial_unjustified_absences?: number;
+  initial_absences_by_type?: InitialAbsencesByType;
   archived_at: string | null;
   created_at: string;
 }
@@ -135,7 +138,7 @@ export interface Thresholds {
   unjustified: number;
 }
 
-export interface ModuleStats {
+export interface AttendanceStats {
   moduleId: string;
   initialAbsences: number;
   justified: number;
@@ -150,9 +153,18 @@ export interface ModuleStats {
   remainingTotal: number;
   remainingUnjustified: number;
   risk: RiskLevel;
-  /** A warning module where either kind of additional absence causes exclusion. */
+  /** A warning where either kind of additional absence causes exclusion. */
   critical: boolean;
   thresholds: Thresholds;
+}
+
+export interface SessionStats extends AttendanceStats {
+  sessionType: SessionType;
+}
+
+export interface ModuleStats extends AttendanceStats {
+  sessionStats: SessionStats[];
+  unassignedInitialAbsences: number;
 }
 
 export interface AbsenceSimulation {

@@ -3,6 +3,8 @@ import { isNonTeachingOccurrence } from "./academic-calendar";
 import { t } from "./i18n";
 import type {
   AbsenceSimulation,
+  AttendanceStats,
+  SessionStats,
   AppData,
   Attendance,
   Module,
@@ -124,29 +126,36 @@ export function getCountedRecords(
   });
 }
 
-export function getModuleStats(
+export const SESSION_TYPES: readonly SessionType[] = ["Lecture", "TD", "TP"];
+
+/** Limits apply independently to a module’s Lecture, TD and TP sessions. */
+export function getSessionStats(
   module: Module,
   data: AppData,
+  sessionType: SessionType,
   now: Date | number = Date.now(),
-): ModuleStats {
+): SessionStats {
   const limits = getThresholds(module, data.student);
   const latest = latestAttendance(data);
   const occurrences = data.occurrences.filter(
     (occurrence) =>
       occurrence.module_id === module.id &&
+      occurrence.session_type === sessionType &&
       !occurrence.cancelled &&
       !isNonTeachingOccurrence(occurrence, data.student.timezone) &&
       latest.get(occurrence.id)?.attendance_status !== "cancelled",
   );
+  const occurrenceIds = new Set(occurrences.map((occurrence) => occurrence.id));
   const records = getCountedRecords(data, now).filter(
-    (record) => record.module_id === module.id,
+    (record) => occurrenceIds.has(record.occurrence_id),
   );
+  const initial = module.initial_absences_by_type?.[sessionType];
   const justified = records.filter(
     (record) => record.attendance_status === "justified",
-  ).length + (module.initial_justified_absences ?? 0);
+  ).length + (initial?.justified ?? 0);
   const unjustified = records.filter(
     (record) => record.attendance_status === "unjustified",
-  ).length + (module.initial_unjustified_absences ?? 0);
+  ).length + (initial?.unjustified ?? 0);
   const present = records.filter(
     (record) => record.attendance_status === "present",
   ).length;
@@ -157,7 +166,8 @@ export function getModuleStats(
   const risk = classifyRisk(justified, unjustified, limits);
   return {
     moduleId: module.id,
-    initialAbsences: (module.initial_justified_absences ?? 0) + (module.initial_unjustified_absences ?? 0),
+    sessionType,
+    initialAbsences: (initial?.justified ?? 0) + (initial?.unjustified ?? 0),
     justified,
     unjustified,
     totalAbsences,
@@ -177,8 +187,49 @@ export function getModuleStats(
   };
 }
 
+/** Module totals are informational; risk comes from the highest-risk session type. */
+export function getModuleStats(
+  module: Module,
+  data: AppData,
+  now: Date | number = Date.now(),
+): ModuleStats {
+  const sessionStats = SESSION_TYPES.map((type) => getSessionStats(module, data, type, now));
+  const highestRisk = [...sessionStats].sort(compareModuleRisk)[0];
+  const sum = (key: "justified" | "unjustified" | "initialAbsences" | "present" | "recorded" | "scheduled" | "completed" | "unrecorded") =>
+    sessionStats.reduce((total, stats) => total + stats[key], 0);
+  // Legacy balances have no session type. Preserve their totals until the student
+  // assigns them; never guess a type or use a combined balance for exclusion.
+  const unassignedJustified = module.initial_justified_absences ?? 0;
+  const unassignedUnjustified = module.initial_unjustified_absences ?? 0;
+  const unassignedInitialAbsences = unassignedJustified + unassignedUnjustified;
+  const justified = sum("justified") + unassignedJustified;
+  const unjustified = sum("unjustified") + unassignedUnjustified;
+  const recorded = sum("recorded");
+  const present = sum("present");
+  return {
+    moduleId: module.id,
+    sessionStats,
+    unassignedInitialAbsences,
+    initialAbsences: sum("initialAbsences") + unassignedInitialAbsences,
+    justified,
+    unjustified,
+    totalAbsences: justified + unjustified,
+    present,
+    recorded,
+    scheduled: sum("scheduled"),
+    completed: sum("completed"),
+    unrecorded: sum("unrecorded"),
+    attendanceRate: recorded ? Math.round((present / recorded) * 1000) / 10 : null,
+    remainingTotal: Math.min(...sessionStats.map((stats) => stats.remainingTotal)),
+    remainingUnjustified: Math.min(...sessionStats.map((stats) => stats.remainingUnjustified)),
+    risk: highestRisk.risk,
+    critical: highestRisk.risk === "warning" && sessionStats.some((stats) => stats.critical),
+    thresholds: highestRisk.thresholds,
+  };
+}
+
 export function simulateAbsence(
-  current: ModuleStats,
+  current: SessionStats,
   kind: "justified" | "unjustified",
 ): AbsenceSimulation {
   const justified = current.justified + (kind === "justified" ? 1 : 0);
@@ -193,7 +244,7 @@ export function simulateAbsence(
     : risk === "excluded"
       ? "Missing this session would trigger exclusion."
       : risk === "warning"
-        ? "Missing this session would put this module in the warning zone."
+        ? "Missing this session would put this session type in the warning zone."
         : "Your projected attendance would remain within the limits. Attending is still the best way to protect your progress.";
   return {
     kind,
@@ -213,7 +264,7 @@ export function simulateAbsence(
 }
 
 export function getRiskExplanation(
-  stats: ModuleStats,
+  stats: AttendanceStats,
   language: Language = "en",
 ): string {
   if (stats.risk === "excluded") return t(language, "risk.currentExcluded");
@@ -222,7 +273,7 @@ export function getRiskExplanation(
   return t(language, "risk.currentSafe");
 }
 
-export function compareModuleRisk(a: ModuleStats, b: ModuleStats): number {
+export function compareModuleRisk(a: AttendanceStats, b: AttendanceStats): number {
   const order: Record<RiskLevel, number> = { excluded: 3, warning: 2, safe: 1 };
   return (
     order[b.risk] - order[a.risk] ||
@@ -259,6 +310,8 @@ export function getOverview(data: AppData, now: Date | number = Date.now()) {
   const present = sum("present");
   return {
     totalModules: activeModules.length,
+    unassignedInitialAbsences: moduleStats.reduce((total, { stats }) => total + stats.unassignedInitialAbsences, 0),
+    sessionStats: moduleStats.flatMap(({ module, stats }) => stats.sessionStats.map((stats) => ({ module, stats }))).sort((a, b) => compareModuleRisk(a.stats, b.stats)),
     scheduled: sum("scheduled"),
     totalAbsences: sum("totalAbsences"),
     initialAbsences: sum("initialAbsences"),

@@ -1,11 +1,11 @@
-import { getModuleStats, getUpcomingSessions } from "./attendance";
+import { getModuleStats, getSessionStats, getUpcomingSessions } from "./attendance";
 import type { AppData, NotificationDraft } from "./types";
 
 /** Rebuild current alerts after an interrupted request, including starting balances. */
 export function buildCurrentNotifications(data: AppData): NotificationDraft[] {
   return buildNotifications({
     ...data,
-    modules: data.modules.map((module) => ({ ...module, initial_justified_absences: 0, initial_unjustified_absences: 0 })),
+    modules: data.modules.map((module) => ({ ...module, initial_justified_absences: 0, initial_unjustified_absences: 0, initial_absences_by_type: {} })),
     attendance: [],
   }, data);
 }
@@ -22,79 +22,82 @@ export function buildNotifications(
   const nowMs = now instanceof Date ? now.getTime() : now;
   const drafts: NotificationDraft[] = [];
   for (const module of after.modules.filter((item) => !item.archived_at)) {
-    const current = getModuleStats(module, after, now);
-    const previousModule =
-      before.modules.find((item) => item.id === module.id) || { ...module, initial_justified_absences: 0, initial_unjustified_absences: 0 };
-    const previous = getModuleStats(previousModule, before, now);
-    const add = (type: string, title: string, message: string, suffix = "") =>
-      drafts.push({
-        type,
-        title,
-        message,
-        module_id: module.id,
-        occurrence_id: null,
-        dedupe_key: `${type}:${module.id}:${suffix}`,
-      });
-    if (!previous.totalAbsences && current.totalAbsences) {
-      add(
-        "first_absence",
-        french ? "Première absence enregistrée" : "First absence recorded",
-        french
-          ? `${module.name} : votre première absence a été enregistrée. Surveillez les limites de ce module.`
-          : `${module.name}: your first absence has been recorded. Keep an eye on your module limits.`,
-      );
-    }
-    if (current.risk === "excluded" && previous.risk !== "excluded") {
-      add(
-        "exclusion",
-        french ? "Seuil d’exclusion atteint" : "Exclusion threshold reached",
-        french
-          ? `${module.name} compte ${current.totalAbsences} absences au total, dont ${current.unjustified} non justifiées.`
-          : `${module.name} has ${current.totalAbsences} total and ${current.unjustified} unjustified absences.`,
-        `${current.thresholds.total}:${current.thresholds.unjustified}`,
-      );
-    } else if (current.risk !== "excluded") {
-      if (
-        current.unjustified >= current.thresholds.unjustified - 1 &&
-        current.unjustified > 0 &&
-        previous.unjustified < current.thresholds.unjustified - 1
-      ) {
+    for (const current of getModuleStats(module, after, now).sessionStats) {
+      const type = current.sessionType;
+      const label = `${module.name} · ${french && type === "Lecture" ? "Cours" : type}`;
+      const previousModule =
+        before.modules.find((item) => item.id === module.id) || { ...module, initial_justified_absences: 0, initial_unjustified_absences: 0, initial_absences_by_type: {} };
+      const previous = getSessionStats(previousModule, before, type, now);
+      const add = (type: string, title: string, message: string, suffix = "") =>
+        drafts.push({
+          type,
+          title,
+          message,
+          module_id: module.id,
+          occurrence_id: null,
+          dedupe_key: `${type}:${module.id}:${current.sessionType}:${suffix}`,
+        });
+      if (!previous.totalAbsences && current.totalAbsences) {
         add(
-          "warning_unjustified",
+          "first_absence",
+          french ? "Première absence enregistrée" : "First absence recorded",
           french
-            ? "Alerte d’absences non justifiées"
-            : "Unjustified absence warning",
-          french
-            ? `${module.name} : une absence non justifiée supplémentaire entraînerait une exclusion.`
-            : `${module.name}: one more unjustified absence would reach exclusion.`,
-          String(current.thresholds.unjustified),
+            ? `${label} : votre première absence a été enregistrée. Surveillez les limites de ce type de séance.`
+            : `${label}: your first absence has been recorded. Keep an eye on your limits for this session type.`,
         );
       }
-      if (
-        current.totalAbsences >= current.thresholds.total - 1 &&
-        current.totalAbsences > 0 &&
-        previous.totalAbsences < current.thresholds.total - 1
-      ) {
+      if (current.risk === "excluded" && previous.risk !== "excluded") {
         add(
-          "warning_total",
-          french ? "Alerte du total des absences" : "Total absence warning",
+          "exclusion",
+          french ? "Seuil d’exclusion atteint" : "Exclusion threshold reached",
           french
-            ? `${module.name} : une absence supplémentaire, justifiée ou non, entraînerait une exclusion.`
-            : `${module.name}: one more absence of either kind would reach exclusion.`,
-          String(current.thresholds.total),
+            ? `${label} compte ${current.totalAbsences} absences au total, dont ${current.unjustified} non justifiées.`
+            : `${label} has ${current.totalAbsences} total and ${current.unjustified} unjustified absences.`,
+          `${current.thresholds.total}:${current.thresholds.unjustified}`,
         );
-      }
-      if (current.critical && !previous.critical) {
-        add(
-          "critical",
-          french
-            ? "Votre présence mérite votre attention"
-            : "Attendance needs your attention",
-          french
-            ? `${module.name} : manquer une autre séance entraînerait une exclusion, même avec un justificatif.`
-            : `${module.name}: missing another session would trigger exclusion regardless of justification.`,
-          String(current.thresholds.total),
-        );
+      } else if (current.risk !== "excluded") {
+        if (
+          current.unjustified >= current.thresholds.unjustified - 1 &&
+          current.unjustified > 0 &&
+          previous.unjustified < current.thresholds.unjustified - 1
+        ) {
+          add(
+            "warning_unjustified",
+            french
+              ? "Alerte d’absences non justifiées"
+              : "Unjustified absence warning",
+            french
+              ? `${label} : une absence non justifiée supplémentaire entraînerait une exclusion.`
+              : `${label}: one more unjustified absence would reach exclusion.`,
+            String(current.thresholds.unjustified),
+          );
+        }
+        if (
+          current.totalAbsences >= current.thresholds.total - 1 &&
+          current.totalAbsences > 0 &&
+          previous.totalAbsences < current.thresholds.total - 1
+        ) {
+          add(
+            "warning_total",
+            french ? "Alerte du total des absences" : "Total absence warning",
+            french
+              ? `${label} : une absence supplémentaire, justifiée ou non, entraînerait une exclusion.`
+              : `${label}: one more absence of either kind would reach exclusion.`,
+            String(current.thresholds.total),
+          );
+        }
+        if (current.critical && !previous.critical) {
+          add(
+            "critical",
+            french
+              ? "Votre présence mérite votre attention"
+              : "Attendance needs your attention",
+            french
+              ? `${label} : manquer une autre séance entraînerait une exclusion, même avec un justificatif.`
+              : `${label}: missing another session would trigger exclusion regardless of justification.`,
+            String(current.thresholds.total),
+          );
+        }
       }
     }
   }

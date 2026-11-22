@@ -16,6 +16,13 @@ export const attendanceStatusSchema = z.enum([
   "cancelled",
 ]);
 export const sessionTypeSchema = z.enum(["Lecture", "TD", "TP"]);
+const initialAbsenceCount = z.number().int().min(0).max(1000);
+const initialAbsenceBalance = z.object({ justified: initialAbsenceCount, unjustified: initialAbsenceCount }).strict();
+export const initialAbsencesByTypeSchema = z.object({
+  Lecture: initialAbsenceBalance.optional(),
+  TD: initialAbsenceBalance.optional(),
+  TP: initialAbsenceBalance.optional(),
+}).strict();
 export const thresholdSchema = z
   .number()
   .int()

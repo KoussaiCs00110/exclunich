@@ -565,8 +565,8 @@ export function SettingsPage() {
                   style={{ marginTop: 18, fontSize: 14, lineHeight: 1.7 }}
                 >
                   {phrase(
-                    "Warnings appear one absence before either threshold. Module-specific overrides take priority. Updating these limits recalculates your risks immediately; confirm the official rules with your department.",
-                    "Les alertes apparaissent une absence avant chaque seuil. Les limites propres à un module sont prioritaires. Toute modification recalcule immédiatement vos risques ; vérifiez les règles officielles auprès de votre département.",
+                    "Warnings appear one absence before either threshold. Limits apply separately to Lecture, TD and TP within each module. Module-specific overrides take priority. Updating these limits recalculates your risks immediately; confirm the official rules with your department.",
+                    "Les alertes apparaissent une absence avant chaque seuil. Les seuils s’appliquent séparément aux Cours, TD et TP de chaque module. Les limites propres à un module sont prioritaires. Toute modification recalcule immédiatement vos risques ; vérifiez les règles officielles auprès de votre département.",
                   )}
                 </p>
                 {error && (

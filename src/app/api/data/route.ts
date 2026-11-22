@@ -101,7 +101,9 @@ export async function POST(request: NextRequest) {
       delete body.currentToken;
     }
     const result = await rpc(input.action, body, credential,
-      input.action === "module_save" && (input.initial_justified_absences !== undefined || input.initial_unjustified_absences !== undefined)
+      input.action === "module_save" && input.initial_absences_by_type !== undefined
+        ? "exclunich_module_save_by_type"
+        : input.action === "module_save" && (input.initial_justified_absences !== undefined || input.initial_unjustified_absences !== undefined)
         ? "exclunich_module_save" : "absentia_api");
     if (input.action === "session_save") {
       // Also support deployed databases before the calendar trigger is installed.

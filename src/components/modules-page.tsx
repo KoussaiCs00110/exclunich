@@ -21,12 +21,13 @@ import {
 import { toast } from "sonner";
 import {
   getModuleStats,
+  SESSION_TYPES,
   getRiskExplanation,
   simulateAbsence,
 } from "@/lib/attendance";
 import { formatInZone } from "@/lib/timezone";
 import { t, semesterLabel, sessionTypeLabel } from "@/lib/i18n";
-import type { Module, Occurrence } from "@/lib/types";
+import type { InitialAbsencesByType, Module, Occurrence } from "@/lib/types";
 import { useWorkspace } from "./workspace";
 import { ModuleIcon, RiskBadge, RiskRow } from "./dashboard";
 import { Modal } from "./modal";
@@ -62,6 +63,7 @@ export function ModuleEditor({
     initial_justified_absences: String(module?.initial_justified_absences ?? 0),
     initial_unjustified_absences: String(module?.initial_unjustified_absences ?? 0),
   });
+  const [initialByType, setInitialByType] = useState<InitialAbsencesByType>(module?.initial_absences_by_type ?? {});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const field = (key: keyof typeof values, value: string) =>
@@ -75,6 +77,7 @@ export function ModuleEditor({
       await mutate("module_save", {
         ...values,
         id: module?.id,
+        initial_absences_by_type: initialByType,
         total_threshold: values.total_threshold
           ? Number(values.total_threshold)
           : null,
@@ -199,16 +202,32 @@ export function ModuleEditor({
           <fieldset className="span-2 initial-absence-fields" aria-describedby="initial-absence-help">
             <legend>{t(lang, "module.initialTitle")}</legend>
             <p id="initial-absence-help">{t(lang, "module.initialBody")}</p>
-            <div className="form-grid">
-              <div className="field">
-                <label htmlFor="module-initial-justified">{t(lang, "module.initialJustified")}</label>
-                <input className="input" id="module-initial-justified" type="number" min={0} max={1000} step={1} value={values.initial_justified_absences} onChange={(e) => field("initial_justified_absences", e.target.value)} />
+            {SESSION_TYPES.map((type) => (
+              <div className="form-grid" key={type}>
+                {(["justified", "unjustified"] as const).map((kind) => (
+                  <div className="field" key={kind}>
+                    <label htmlFor={`module-initial-${type}-${kind}`}>{sessionTypeLabel(type, lang)} · {t(lang, kind === "justified" ? "module.initialJustified" : "module.initialUnjustified")}</label>
+                    <input className="input" id={`module-initial-${type}-${kind}`} type="number" min={0} max={1000} step={1}
+                      value={initialByType[type]?.[kind] ?? 0}
+                      onChange={(event) => setInitialByType((previous) => ({ ...previous, [type]: { justified: previous[type]?.justified ?? 0, unjustified: previous[type]?.unjustified ?? 0, [kind]: Number(event.target.value) } }))} />
+                  </div>
+                ))}
               </div>
-              <div className="field">
-                <label htmlFor="module-initial-unjustified">{t(lang, "module.initialUnjustified")}</label>
-                <input className="input" id="module-initial-unjustified" type="number" min={0} max={1000} step={1} value={values.initial_unjustified_absences} onChange={(e) => field("initial_unjustified_absences", e.target.value)} />
-              </div>
-            </div>
+            ))}
+            {((module?.initial_justified_absences ?? 0) + (module?.initial_unjustified_absences ?? 0) > 0) && (
+              <>
+                <p>{t(lang, "module.unassignedNotice", { count: (module?.initial_justified_absences ?? 0) + (module?.initial_unjustified_absences ?? 0) })}</p>
+                <div className="form-grid">
+                  {(["justified", "unjustified"] as const).map((kind) => {
+                    const key = kind === "justified" ? "initial_justified_absences" : "initial_unjustified_absences";
+                    return <div className="field" key={kind}>
+                      <label htmlFor={`module-unassigned-${kind}`}>{t(lang, "module.unassigned")} · {t(lang, kind === "justified" ? "module.initialJustified" : "module.initialUnjustified")}</label>
+                      <input className="input" id={`module-unassigned-${kind}`} type="number" min={0} max={1000} step={1} value={values[key]} onChange={(event) => field(key, event.target.value)} />
+                    </div>;
+                  })}
+                </div>
+              </>
+            )}
             <p className="initial-absence-fine-print">{t(lang, "module.initialRate")}</p>
           </fieldset>
           <div className="field">
@@ -400,25 +419,17 @@ export default function ModulesPage() {
                   </div>
                 </div>
                 {stats.initialAbsences > 0 && <p className="initial-absence-summary">{t(lang, "module.initialSummary", { count: stats.initialAbsences })}</p>}
-                <div className="bar-caption">
-                  <span>{t(lang, "risk.totalThreshold")}</span>
-                  <span>
-                    {stats.totalAbsences}/{stats.thresholds.total}
-                  </span>
-                </div>
-                <div className="progress">
-                  <span
-                    style={{
-                      width: `${Math.min(100, (stats.totalAbsences / stats.thresholds.total) * 100)}%`,
-                      background:
-                        stats.risk === "safe"
-                          ? module.color
-                          : stats.risk === "warning"
-                            ? "var(--amber)"
-                            : "var(--red)",
-                    }}
-                  />
-                </div>
+                {stats.unassignedInitialAbsences > 0 && <p className="help-caption">{t(lang, "module.unassignedNotice", { count: stats.unassignedInitialAbsences })}</p>}
+                {stats.sessionStats.map((session) => (
+                  <div key={session.sessionType}>
+                    <div className="bar-caption">
+                      <span>{sessionTypeLabel(session.sessionType, lang)}</span>
+                      <span>{session.totalAbsences}/{session.thresholds.total} · {session.unjustified}/{session.thresholds.unjustified} {t(lang, "risk.unjustified")}</span>
+                      <RiskBadge stats={session} />
+                    </div>
+                    <div className="progress"><span style={{ width: `${Math.min(100, Math.max(session.totalAbsences / session.thresholds.total, session.unjustified / session.thresholds.unjustified) * 100)}%`, background: session.risk === "safe" ? module.color : session.risk === "warning" ? "var(--amber)" : "var(--red)" }} /></div>
+                  </div>
+                ))}
                 <div className="module-card-actions">
                   <Link href={`/modules/${module.id}`} className="text-link">
                     {t(lang, "module.view")}
@@ -585,12 +596,12 @@ export function ModuleDetail({ id }: { id: string }) {
           ],
           [
             t(lang, "totalAbsences"),
-            `${stats.totalAbsences} / ${stats.thresholds.total}`,
+            stats.totalAbsences,
           ],
           [t(lang, "dashboard.justifiedLabel"), stats.justified],
           [
             t(lang, "dashboard.unjustifiedLabel"),
-            `${stats.unjustified} / ${stats.thresholds.unjustified}`,
+            stats.unjustified,
           ],
         ].map(([label, value]) => (
           <div className="card stat-card" key={label}>
@@ -603,6 +614,7 @@ export function ModuleDetail({ id }: { id: string }) {
         <div className="card initial-absence-notice">
           <strong>{t(lang, "module.initialSummary", { count: stats.initialAbsences })}</strong>
           <p>{t(lang, "module.initialRate")}</p>
+          {stats.unassignedInitialAbsences > 0 && <p>{t(lang, "module.unassignedNotice", { count: stats.unassignedInitialAbsences })}</p>}
         </div>
       )}
       <div className="module-details-grid">
@@ -737,27 +749,31 @@ export function ModuleDetail({ id }: { id: string }) {
         <div className="stack">
           <section className="card card-body">
             <h2>{t(lang, "module.assessment")}</h2>
-            <RiskRow module={module} stats={stats} />
-            <div
-              className={`notice ${stats.risk === "excluded" ? "notice-danger" : stats.risk === "safe" ? "notice-info" : ""}`}
-            >
-              <ShieldCheck size={17} />
-              <div>
-                <strong>{getRiskExplanation(stats, lang)}</strong>
-                <p>
-                  {t(lang, "module.projections", {
-                    unjustified: t(
-                      lang,
-                      simulateAbsence(stats, "unjustified").risk,
-                    ),
-                    justified: t(
-                      lang,
-                      simulateAbsence(stats, "justified").risk,
-                    ),
-                  })}
-                </p>
+            {stats.sessionStats.map((stats) => (
+              <div key={stats.sessionType}>
+                <RiskRow module={module} stats={stats} />
+                <div
+                  className={`notice ${stats.risk === "excluded" ? "notice-danger" : stats.risk === "safe" ? "notice-info" : ""}`}
+                >
+                  <ShieldCheck size={17} />
+                  <div>
+                    <strong>{getRiskExplanation(stats, lang)}</strong>
+                    <p>
+                      {t(lang, "module.projections", {
+                        unjustified: t(
+                          lang,
+                          simulateAbsence(stats, "unjustified").risk,
+                        ),
+                        justified: t(
+                          lang,
+                          simulateAbsence(stats, "justified").risk,
+                        ),
+                      })}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </section>
           <section className="card card-body">
             <h2>{t(lang, "module.manage")}</h2>

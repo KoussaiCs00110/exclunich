@@ -9,6 +9,7 @@ import { buildNotifications } from "../notifications";
 import { localDateKey, localDateTimeToISO, isValidTimezone } from "../timezone";
 import { academicPeriodForDate, isNonTeachingOccurrence, applyAcademicCalendar, teachingDates } from "../academic-calendar";
 import { ApiError } from "./database";
+import { initialAbsencesByTypeSchema } from "../schemas";
 import {
   buildTimetableSnapshot,
   importTimetableSnapshot,
@@ -111,6 +112,7 @@ export async function mutateLocalDemo(
       const initialUnjustified = input.initial_unjustified_absences ?? previousModule?.initial_unjustified_absences ?? 0;
       if (![initialJustified, initialUnjustified].every((value) => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 1000))
         throw new ApiError("Earlier absences must be whole numbers between 0 and 1000.");
+      const initialByType = initialAbsencesByTypeSchema.parse(input.initial_absences_by_type ?? previousModule?.initial_absences_by_type ?? {});
       const values = {
         name: String(input.name),
         code: String(input.code),
@@ -120,6 +122,7 @@ export async function mutateLocalDemo(
         semester: String(input.semester),
         total_threshold: input.total_threshold as number | null,
         unjustified_threshold: input.unjustified_threshold as number | null,
+        initial_absences_by_type: initialByType,
         initial_justified_absences: initialJustified as number,
         initial_unjustified_absences: initialUnjustified as number,
       };

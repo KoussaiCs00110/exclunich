@@ -3,6 +3,7 @@ import {
   classifyRisk,
   getCountedRecords,
   getModuleStats,
+  getSessionStats,
   getOverview,
   getThresholds,
   getUpcomingSessions,
@@ -85,31 +86,31 @@ const stats = (data: AppData, module = data.modules[0]) =>
 describe("mid-semester starting balances", () => {
   it("combines earlier and dated absences once without inventing an attendance denominator", () => {
     const data = fixture(["present", "justified"]);
-    Object.assign(data.modules[0], { initial_justified_absences: 1, initial_unjustified_absences: 2 });
+    data.modules[0].initial_absences_by_type = { Lecture: { justified: 1, unjustified: 2 } };
     const before = structuredClone(data);
     const current = stats(data);
     expect(current).toMatchObject({ justified: 2, unjustified: 2, initialAbsences: 3, totalAbsences: 4, recorded: 2, scheduled: 2, completed: 2, unrecorded: 0, attendanceRate: 50, risk: "warning" });
-    expect(simulateAbsence(current, "unjustified").risk).toBe("excluded");
-    expect(simulateAbsence(current, "justified").risk).toBe("excluded");
+    expect(simulateAbsence(current.sessionStats[0], "unjustified").risk).toBe("excluded");
+    expect(simulateAbsence(current.sessionStats[0], "justified").risk).toBe("excluded");
     expect(data).toEqual(before);
     expect(getAttendanceTrend(data, "month", NOW)[0].absences).toBe(1);
     expect(getAttendanceByType(data, NOW)[0].recorded).toBe(2);
   });
   it("recognizes an earlier exclusion with no recorded sessions", () => {
     const data = fixture();
-    data.modules[0].initial_unjustified_absences = 3;
+    data.modules[0].initial_absences_by_type = { Lecture: { justified: 0, unjustified: 3 } };
     expect(stats(data)).toMatchObject({ totalAbsences: 3, risk: "excluded", attendanceRate: null, recorded: 0, scheduled: 0, unrecorded: 0 });
     expect(getOverview(data, NOW)).toMatchObject({ totalAbsences: 3, initialAbsences: 3, excluded: 1 });
   });
   it("replaces a corrected starting balance and keeps dated corrections independent", () => {
     const data = fixture(["unjustified"]);
-    data.modules[0].initial_unjustified_absences = 2;
+    data.modules[0].initial_absences_by_type = { Lecture: { justified: 0, unjustified: 2 } };
     expect(stats(data).risk).toBe("excluded");
-    data.modules[0].initial_unjustified_absences = 1;
+    data.modules[0].initial_absences_by_type!.Lecture!.unjustified = 1;
     expect(stats(data)).toMatchObject({ totalAbsences: 2, risk: "warning" });
     data.attendance[0].attendance_status = "present";
     expect(stats(data)).toMatchObject({ totalAbsences: 1, attendanceRate: 100, risk: "safe" });
-    data.modules[0].initial_unjustified_absences = 0;
+    data.modules[0].initial_absences_by_type!.Lecture!.unjustified = 0;
     expect(stats(data).totalAbsences).toBe(0);
   });
   it("keeps balances scoped to their module and preserves archived history", () => {
@@ -123,7 +124,7 @@ describe("mid-semester starting balances", () => {
   });
   it("emits and reconciles starting-balance warnings for a newly added module", () => {
     const after = fixture();
-    after.modules[0].initial_unjustified_absences = 2;
+    after.modules[0].initial_absences_by_type = { Lecture: { justified: 0, unjustified: 2 } };
     const before = { ...fixture(), modules: [] };
     expect(buildNotifications(before, after, { now: NOW }).map((item) => item.type)).toContain("warning_unjustified");
     expect(buildCurrentNotifications(after).map((item) => item.type)).toContain("warning_unjustified");
@@ -165,7 +166,7 @@ describe("central exclusion engine — required scenarios", () => {
       "justified",
     ]);
     const original = JSON.stringify(data);
-    expect(simulateAbsence(stats(data), "unjustified")).toMatchObject({
+    expect(simulateAbsence(stats(data).sessionStats[0], "unjustified")).toMatchObject({
       risk: "excluded",
       totalAbsences: 5,
       unjustified: 3,
@@ -181,7 +182,7 @@ describe("central exclusion engine — required scenarios", () => {
       "justified",
       "justified",
     ]);
-    expect(simulateAbsence(stats(data), "justified")).toMatchObject({
+    expect(simulateAbsence(stats(data).sessionStats[0], "justified")).toMatchObject({
       risk: "excluded",
       totalAbsences: 5,
       unjustified: 2,
@@ -233,7 +234,7 @@ describe("central exclusion engine — required scenarios", () => {
       fixture(["unjustified", "unjustified", "unjustified"]),
     );
     for (const kind of ["justified", "unjustified"] as const) {
-      expect(simulateAbsence(current, kind)).toMatchObject({
+      expect(simulateAbsence(current.sessionStats[0], kind)).toMatchObject({
         alreadyExcluded: true,
         risk: "excluded",
       });
@@ -485,5 +486,99 @@ describe("cancellation denominator consistency", () => {
       recorded: 1,
       attendanceRate: 100,
     });
+  });
+});
+
+describe("independent absence limits for Lecture, TD and TP", () => {
+  function mixed() {
+    const data = fixture(["unjustified", "unjustified", "unjustified", "justified", "justified", "justified"]);
+    data.occurrences.forEach((occurrence, index) => {
+      occurrence.session_type = (["Lecture", "TD", "TP"] as const)[index % 3];
+      occurrence.session_id = `series-${index}`;
+    });
+    return data;
+  }
+
+  it("does not pool absences across types when classifying a module", () => {
+    const data = mixed();
+    expect(stats(data)).toMatchObject({ totalAbsences: 6, unjustified: 3, risk: "safe", remainingTotal: 3, remainingUnjustified: 2 });
+    for (const type of ["Lecture", "TD", "TP"] as const) {
+      expect(getSessionStats(data.modules[0], data, type, NOW)).toMatchObject({ sessionType: type, totalAbsences: 2, justified: 1, unjustified: 1, recorded: 2, risk: "safe" });
+    }
+    expect(getOverview(data, NOW)).toMatchObject({ totalAbsences: 6, excluded: 0, atRisk: 0, safe: 1, recorded: 6 });
+  });
+
+  it("combines multiple timetable series of the same type within a module", () => {
+    const data = fixture(Array(3).fill("unjustified"));
+    data.occurrences.forEach((occurrence, index) => {
+      occurrence.session_type = "TD";
+      occurrence.session_id = `series-${index}`;
+    });
+    expect(getSessionStats(data.modules[0], data, "TD", NOW).risk).toBe("excluded");
+    expect(getSessionStats(data.modules[0], data, "Lecture", NOW).risk).toBe("safe");
+    expect(stats(data).risk).toBe("excluded");
+    expect(getOverview(data, NOW).excluded).toBe(1);
+  });
+
+  it("simulates only the selected type even when another type is excluded", () => {
+    const data = mixed();
+    data.modules[0].initial_absences_by_type = { TD: { justified: 0, unjustified: 2 } };
+    const original = structuredClone(data);
+    const lecture = getSessionStats(data.modules[0], data, "Lecture", NOW);
+    const td = getSessionStats(data.modules[0], data, "TD", NOW);
+    expect(simulateAbsence(lecture, "justified")).toMatchObject({ risk: "safe", totalAbsences: 3, alreadyExcluded: false });
+    expect(simulateAbsence(lecture, "unjustified")).toMatchObject({ risk: "warning", unjustified: 2, alreadyExcluded: false });
+    expect(simulateAbsence(td, "justified")).toMatchObject({ risk: "excluded", alreadyExcluded: true });
+    expect(data).toEqual(original);
+  });
+
+  it("adds earlier balances only to their assigned type and counts totals once", () => {
+    const data = mixed();
+    data.modules[0].initial_absences_by_type = { TD: { justified: 1, unjustified: 1 }, TP: { justified: 0, unjustified: 2 } };
+    expect(getSessionStats(data.modules[0], data, "Lecture", NOW)).toMatchObject({ initialAbsences: 0, totalAbsences: 2, risk: "safe" });
+    expect(getSessionStats(data.modules[0], data, "TD", NOW)).toMatchObject({ initialAbsences: 2, totalAbsences: 4, risk: "warning", critical: true });
+    expect(getSessionStats(data.modules[0], data, "TP", NOW)).toMatchObject({ initialAbsences: 2, unjustified: 3, risk: "excluded" });
+    expect(stats(data)).toMatchObject({ initialAbsences: 4, totalAbsences: 10, recorded: 6, attendanceRate: 0, risk: "excluded" });
+    expect(getOverview(data, NOW)).toMatchObject({ initialAbsences: 4, totalAbsences: 10, excluded: 1, critical: 0 });
+    data.modules.push({ ...moduleA, id: "other" });
+    expect(getSessionStats(data.modules[1], data, "TP", NOW).totalAbsences).toBe(0);
+  });
+
+  it("preserves unassigned legacy balances without guessing an exclusion type", () => {
+    const data = fixture();
+    data.modules[0].initial_unjustified_absences = 3;
+    expect(stats(data)).toMatchObject({ totalAbsences: 3, initialAbsences: 3, unassignedInitialAbsences: 3, risk: "safe" });
+    expect(getOverview(data, NOW)).toMatchObject({ totalAbsences: 3, unassignedInitialAbsences: 3, excluded: 0 });
+    expect(buildNotifications(fixture(), data, { now: NOW })).toEqual([]);
+    data.modules[0].initial_unjustified_absences = 0;
+    data.modules[0].initial_absences_by_type = { TP: { justified: 0, unjustified: 3 } };
+    expect(stats(data)).toMatchObject({ totalAbsences: 3, unassignedInitialAbsences: 0, risk: "excluded" });
+  });
+
+  it("keeps cancellations, future records and latest corrections scoped to their types", () => {
+    const data = mixed();
+    data.occurrences[0].cancelled = true;
+    data.attendance[1].attendance_status = "cancelled";
+    data.occurrences[2].ends_at = "2026-11-21T09:30:00Z";
+    data.attendance.push({ ...data.attendance[3], id: "corrected", attendance_status: "present", updated_at: "2026-11-11T12:00:00Z" });
+    expect(getSessionStats(data.modules[0], data, "Lecture", NOW)).toMatchObject({ totalAbsences: 0, recorded: 1, present: 1, scheduled: 1, attendanceRate: 100 });
+    expect(getSessionStats(data.modules[0], data, "TD", NOW)).toMatchObject({ totalAbsences: 1, recorded: 1, scheduled: 1 });
+    expect(getSessionStats(data.modules[0], data, "TP", NOW)).toMatchObject({ totalAbsences: 1, recorded: 1, scheduled: 2, completed: 1 });
+  });
+
+  it("generates separate, deduplicated alerts for each type", () => {
+    const before = mixed();
+    const after = structuredClone(before);
+    after.modules[0].initial_absences_by_type = { TD: { justified: 0, unjustified: 1 }, TP: { justified: 0, unjustified: 1 } };
+    const alerts = buildNotifications(before, after, { now: NOW });
+    expect(alerts.map((item) => item.type)).toEqual(["warning_unjustified", "warning_unjustified"]);
+    expect(alerts[0].message).toContain("TD");
+    expect(alerts[1].message).toContain("TP");
+    expect(new Set(alerts.map((item) => item.dedupe_key)).size).toBe(2);
+    const excluded = structuredClone(after);
+    excluded.modules[0].initial_absences_by_type!.TD!.unjustified = 2;
+    expect(buildNotifications(after, excluded, { now: NOW })).toMatchObject([{ type: "exclusion", message: expect.stringContaining("TD") }]);
+    expect(buildNotifications(excluded, excluded, { now: NOW })).toEqual([]);
+    expect(buildCurrentNotifications(after).filter((item) => item.type === "warning_unjustified")).toHaveLength(2);
   });
 });

@@ -28,7 +28,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { getModuleStats, simulateAbsence } from "@/lib/attendance";
+import { getSessionStats, SESSION_TYPES, simulateAbsence } from "@/lib/attendance";
 import { ACADEMIC_PERIODS, academicPeriodForDate, isNonTeachingOccurrence } from "@/lib/academic-calendar";
 import type { AppData, Occurrence } from "@/lib/types";
 import { SessionPanel } from "./session-panel";
@@ -165,10 +165,10 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
   const risks = useMemo(
     () =>
       new Map(
-        data.modules.map((module) => [
-          module.id,
-          simulateAbsence(getModuleStats(module, data), "unjustified").risk,
-        ]),
+        data.modules.flatMap((module) => SESSION_TYPES.map((type) => [
+          `${module.id}:${type}`,
+          simulateAbsence(getSessionStats(module, data, type), "unjustified").risk,
+        ] as const)),
       ),
     [data],
   );
@@ -205,13 +205,13 @@ export function Timetable({ data, onMutate, onRefresh }: TimetableProps) {
             classNames: [
               "absentia-calendar-event",
               occurrence.cancelled ? "is-cancelled" : "",
-              `risk-${risks.get(module.id)}`,
+              `risk-${risks.get(`${module.id}:${occurrence.session_type}`)}`,
             ],
             editable: !recorded && !occurrence.cancelled,
             extendedProps: {
               occurrence,
               module,
-              risk: risks.get(module.id),
+              risk: risks.get(`${module.id}:${occurrence.session_type}`),
               recorded,
             },
           };

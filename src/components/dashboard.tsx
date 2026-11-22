@@ -18,18 +18,18 @@ import {
   ShieldX,
 } from "lucide-react";
 import {
-  getModuleStats,
+  getSessionStats,
   getOverview,
   getUpcomingSessions,
   simulateAbsence,
 } from "@/lib/attendance";
 import { formatInZone } from "@/lib/timezone";
 import { t, sessionTypeLabel, semesterLabel } from "@/lib/i18n";
-import type { Module, ModuleStats, Occurrence } from "@/lib/types";
+import type { Module, AttendanceStats, SessionStats, Occurrence } from "@/lib/types";
 import { useWorkspace } from "./workspace";
 import { SessionPanel } from "./session-panel";
 import { Analytics } from "./analytics";
-export function RiskBadge({ stats }: { stats: ModuleStats }) {
+export function RiskBadge({ stats }: { stats: AttendanceStats }) {
   const { data } = useWorkspace();
   const lang = data.student.language;
   return (
@@ -69,7 +69,7 @@ export function RiskRow({
   stats,
 }: {
   module: Module;
-  stats: ModuleStats;
+  stats: SessionStats;
 }) {
   const { data } = useWorkspace();
   const lang = data.student.language;
@@ -80,7 +80,7 @@ export function RiskRow({
           <ModuleIcon module={module} />
           <div>
             <span className="module-name">{module.name}</span>
-            <span className="module-code">{module.code}</span>
+            <span className="module-code">{module.code} · {sessionTypeLabel(stats.sessionType, lang)}</span>
           </div>
         </Link>
         <RiskBadge stats={stats} />
@@ -322,8 +322,8 @@ export default function Dashboard() {
             </div>
             {overview.totalModules ? (
               <div className="risk-list">
-                {overview.moduleStats.map(({ module, stats }) => (
-                  <RiskRow key={module.id} module={module} stats={stats} />
+                {overview.sessionStats.map(({ module, stats }) => (
+                  <RiskRow key={`${module.id}:${stats.sessionType}`} module={module} stats={stats} />
                 ))}
               </div>
             ) : (
@@ -333,6 +333,7 @@ export default function Dashboard() {
                 <p>{t(lang, "dashboard.riskEmptyBody")}</p>
               </div>
             )}
+            {overview.unassignedInitialAbsences > 0 && <p className="help-caption">{t(lang, "module.unassignedNotice", { count: overview.unassignedInitialAbsences })}</p>}
             <div className="card-footer">
               <Link href="/modules" className="text-link">
                 {t(lang, "dashboard.allModules")}
@@ -452,7 +453,7 @@ export default function Dashboard() {
                     (m) => m.id === occurrence.module_id,
                   )!;
                   const risk = simulateAbsence(
-                    getModuleStats(module, data),
+                    getSessionStats(module, data, occurrence.session_type),
                     "unjustified",
                   );
                   return (
@@ -531,18 +532,18 @@ export default function Dashboard() {
               </span>
             </div>
             <div style={{ padding: "0 20px 20px", display: "grid", gap: 12 }}>
-              {overview.moduleStats
+              {overview.sessionStats
                 .filter(({ stats }) => stats.risk !== "safe")
                 .slice(0, 3)
                 .map(({ module, stats }) => (
                   <Link
                     href={`/modules/${module.id}`}
                     className={`notice ${stats.risk === "excluded" ? "notice-danger" : ""}`}
-                    key={module.id}
+                    key={`${module.id}:${stats.sessionType}`}
                   >
                     <AlertTriangle size={17} />
                     <div>
-                      <strong>{module.name}</strong>
+                      <strong>{module.name} · {sessionTypeLabel(stats.sessionType, lang)}</strong>
                       <p>
                         {stats.risk === "excluded"
                           ? t(lang, "dashboard.exclusionReached")

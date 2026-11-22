@@ -16,6 +16,8 @@ const globalDb = globalThis as unknown as { absentiaPool?: Pool };
 function mapDatabaseError(code: string | undefined, message: string, functionName?: string): never {
   if (functionName === "exclunich_sharing" && code === "22023" && message.startsWith("This timetable is for a different group, department, academic year or semester."))
     throw new ApiError("Timetable imports need an administrator update. Your profile and timetable have not been changed.", 503, "MIGRATION_REQUIRED");
+  if (functionName === "exclunich_module_save_by_type" && ["42883", "PGRST202"].includes(code ?? ""))
+    throw new ApiError("Absences by session type need a database update. Ask the administrator to apply 202611220002_session_type_absences.sql. Your module has not been changed.", 503, "MIGRATION_REQUIRED");
   if (functionName === "exclunich_module_save" && ["42883", "PGRST202"].includes(code ?? ""))
     throw new ApiError("Starting absence balances are not enabled yet. Ask the administrator to enable this feature. Your module has not been changed.", 503, "MIGRATION_REQUIRED");
   if (code === "28000") throw new ApiError(message, 401, "UNAUTHORIZED");
@@ -55,7 +57,7 @@ export async function rpc<T = unknown>(
   action: string,
   body: Record<string, unknown> = {},
   credential: string | null = null,
-  functionName: "absentia_api" | "exclunich_sharing" | "exclunich_module_save" = "absentia_api",
+  functionName: "absentia_api" | "exclunich_sharing" | "exclunich_module_save" | "exclunich_module_save_by_type" = "absentia_api",
 ): Promise<T> {
   if (process.env.DATABASE_URL) {
     if (!globalDb.absentiaPool) {
@@ -72,6 +74,7 @@ export async function rpc<T = unknown>(
           absentia_api: "select public.absentia_api($1,$2::jsonb,$3) as data",
           exclunich_sharing: "select public.exclunich_sharing($1,$2::jsonb,$3) as data",
           exclunich_module_save: "select public.exclunich_module_save($1,$2::jsonb,$3) as data",
+          exclunich_module_save_by_type: "select public.exclunich_module_save_by_type($1,$2::jsonb,$3) as data",
         }[functionName],
         [action, JSON.stringify(body), credential],
       );

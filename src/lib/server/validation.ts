@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { initialAbsencesByTypeSchema } from "../schemas";
 import { normalizeDepartment, normalizeGroup } from "../academic-profile";
 const text = (max = 120) => z.string().trim().max(max);
 const required = (max = 120) => text(max).min(1);
@@ -52,6 +53,7 @@ export const dataSchema = z
       semester: required(30),
       total_threshold: threshold.nullable().optional().default(null),
       unjustified_threshold: threshold.nullable().optional().default(null),
+      initial_absences_by_type: initialAbsencesByTypeSchema.optional(),
       initial_justified_absences: z.number().int().min(0).max(1000).optional(),
       initial_unjustified_absences: z.number().int().min(0).max(1000).optional(),
     }),

@@ -115,6 +115,16 @@ describe("server input validation", () => {
       for (const value of [-1, 1.5, 1001, null, "2", Number.NaN])
         expect(dataSchema.safeParse({ ...module, [field]: value }).success).toBe(false);
   });
+  it("validates earlier balances by session type without coercing invalid values", () => {
+    const module = { action: "module_save", name: "Networks", code: "NET", color: "#628b75", semester: "S3" };
+    expect(dataSchema.parse(module)).not.toHaveProperty("initial_absences_by_type");
+    for (const initial_absences_by_type of [{}, { TD: { justified: 1, unjustified: 2 } }, { Lecture: { justified: 0, unjustified: 1000 }, TP: { justified: 2, unjustified: 0 } }])
+      expect(dataSchema.parse({ ...module, initial_absences_by_type })).toHaveProperty("initial_absences_by_type", initial_absences_by_type);
+    for (const initial_absences_by_type of [null, [], { Other: { justified: 0, unjustified: 0 } }, { TD: null }, { TD: { justified: 0 } }, { TP: { justified: 0, unjustified: 1, extra: 1 } }])
+      expect(dataSchema.safeParse({ ...module, initial_absences_by_type }).success).toBe(false);
+    for (const value of [-1, 1.5, 1001, null, "2", Number.NaN])
+      expect(dataSchema.safeParse({ ...module, initial_absences_by_type: { TD: { justified: 0, unjustified: value } } }).success).toBe(false);
+  });
   it("requires a complete student profile and an explicit saved-secret acknowledgement", () => {
     expect(
       authSchema.safeParse({ action: "register", ...profile }).success,

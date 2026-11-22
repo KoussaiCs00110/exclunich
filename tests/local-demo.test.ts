@@ -95,6 +95,24 @@ describe("persistent local demo workflows", () => {
     expect((await localDemoSnapshot()).modules[0]).toMatchObject({ initial_justified_absences: 0, initial_unjustified_absences: 0 });
     await expect(mutateLocalDemo({ ...save, initial_unjustified_absences: -1 })).rejects.toThrow("whole numbers");
   });
+  it("persists typed balances independently, preserves omitted balances and rejects invalid updates", async () => {
+    const before = await localDemoSnapshot();
+    const item = before.modules[0];
+    const save = { ...item, action: "module_save", description: item.description ?? "" };
+    const balances = { TD: { justified: 1, unjustified: 2 }, TP: { justified: 0, unjustified: 3 } };
+    await mutateLocalDemo({ ...save, initial_absences_by_type: balances });
+    let after = await localDemoSnapshot();
+    expect(after.modules[0].initial_absences_by_type).toEqual(balances);
+    expect(after.attendance).toEqual(before.attendance);
+    expect(getModuleStats(after.modules[0], after).totalAbsences).toBe(getModuleStats(item, before).totalAbsences + 6);
+    await mutateLocalDemo({ ...save, name: "Renamed" });
+    expect((await localDemoSnapshot()).modules[0].initial_absences_by_type).toEqual(balances);
+    await expect(mutateLocalDemo({ ...save, name: "Invalid change", initial_absences_by_type: { TD: { justified: 0, unjustified: -1 } } })).rejects.toThrow();
+    after = await localDemoSnapshot();
+    expect(after.modules[0]).toMatchObject({ name: "Renamed", initial_absences_by_type: balances });
+    await mutateLocalDemo({ ...save, initial_absences_by_type: {} });
+    expect((await localDemoSnapshot()).modules[0].initial_absences_by_type).toEqual({});
+  });
   it("creates, previews and revokes a sharing token without exposing stored hashes", async () => {
     await localDemoSnapshot();
     const created = (await localDemoSharing({

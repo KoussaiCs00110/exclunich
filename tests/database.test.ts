@@ -36,6 +36,13 @@ describe("Supabase HTTP adapter", () => {
     await expect(rpc("module_save", {}, "session", "exclunich_module_save")).rejects.toMatchObject({ status: 503, code: "MIGRATION_REQUIRED" });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+  it("fails atomically when the session-type balance migration is missing", async () => {
+    vi.stubEnv("SUPABASE_URL", "https://project.supabase.co");
+    const fetch = vi.fn().mockResolvedValue(Response.json({ code: "PGRST202", message: "Function not found" }, { status: 404 }));
+    vi.stubGlobal("fetch", fetch);
+    await expect(rpc("module_save", { initial_absences_by_type: { TD: { justified: 0, unjustified: 2 } } }, "session", "exclunich_module_save_by_type")).rejects.toMatchObject({ status: 503, code: "MIGRATION_REQUIRED", message: expect.stringContaining("202611220002_session_type_absences.sql") });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it("excludes existing blocked classes even before database cleanup", async () => {
     vi.stubEnv("SUPABASE_URL", "https://project.supabase.co");
     const snapshot = createLocalDemo();

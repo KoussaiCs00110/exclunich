@@ -16,7 +16,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { getModuleStats, simulateAbsence } from "@/lib/attendance";
+import { getSessionStats, simulateAbsence } from "@/lib/attendance";
 import { formatInZone } from "@/lib/timezone";
 import type { AppData, AttendanceStatus, Occurrence } from "@/lib/types";
 import "./timetable.css";
@@ -147,7 +147,7 @@ export function SessionPanel({
   }, [visible]);
 
   if (!module || !overlayRoot) return null;
-  const stats = getModuleStats(module, data);
+  const stats = getSessionStats(module, data, liveOccurrence.session_type);
   const simulation = simulateAbsence(stats, scenario);
   const otherSimulation = simulateAbsence(
     stats,
@@ -340,7 +340,7 @@ export function SessionPanel({
 
         <section className="session-section">
           <div className="section-title-row">
-            <h3>{phrase("Current attendance", "Présence actuelle")}</h3>
+            <h3>{phrase(`Current attendance · ${liveOccurrence.session_type}`, `Présence actuelle · ${liveOccurrence.session_type === "Lecture" ? "Cours" : liveOccurrence.session_type}`)}</h3>
             <span className={`risk-chip ${stats.risk}`}>
               {stats.risk === "excluded"
                 ? phrase("Excluded", "Exclu")
@@ -389,8 +389,8 @@ export function SessionPanel({
             </div>
             <p className="muted">
               {phrase(
-                "See how one additional absence would affect this module. This does not change your records.",
-                "Voyez l’effet d’une absence supplémentaire sur ce module. Vos données ne changent pas.",
+                "See how one additional absence would affect this session type. This does not change your records.",
+                "Voyez l’effet d’une absence supplémentaire sur ce type de séance. Vos données ne changent pas.",
               )}
             </p>
             <div
@@ -453,7 +453,7 @@ export function SessionPanel({
                           simulation.risk === "excluded"
                             ? "Manquer cette séance entraînerait une exclusion."
                             : simulation.risk === "warning"
-                              ? "Manquer cette séance placerait ce module en zone d’alerte."
+                              ? "Manquer cette séance placerait ce type de séance en zone d’alerte."
                               : "Votre présence projetée reste dans les limites. Assister aux cours reste la meilleure façon de protéger votre progression.",
                         )}
                 </p>
